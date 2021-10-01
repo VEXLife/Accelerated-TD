@@ -2,10 +2,12 @@
 # 作者：BWLL
 # 算法的主体实现
 
-from typing import Any, Iterable, Tuple, Type, final
 import warnings
+from typing import Any, Iterable, Tuple, final
 
 import numpy as np
+
+meta_data = {"trace_update_mode": ["conventional", "emphatic"]}  # 元数据
 
 
 class AbstractAgent:
@@ -20,12 +22,16 @@ class AbstractAgent:
         动作空间大小
     lambd :
         资格迹所需的λ值
+    trace_update_mode :
+        资格迹更新方式，取值``conventional | emphatic``。默认为传统方式(``conventional``)
     '''
 
-    def __init__(self, observation_space_n: int, action_space_n: int, lambd: float = 0) -> None:
+    def __init__(self, observation_space_n: int, action_space_n: int, lambd: float = 0, trace_update_mode="conventional") -> None:
         self.observation_space_n = observation_space_n
         self.action_space_n = action_space_n
         self.lambd = lambd
+        self.trace_update_mode = trace_update_mode
+
         self.w = np.empty(self.observation_space_n)  # 任意地初始化权重
 
         self.reset()
@@ -34,7 +40,9 @@ class AbstractAgent:
         '''
         重置与一局游戏有关的智能体参数。应在一局新游戏开始时调用。
         '''
-        pass
+        self.F = 0
+        self.M = 0
+        self.e = np.zeros(self.observation_space_n)
 
     @final
     def learn(
@@ -120,7 +128,8 @@ class AbstractAgent:
 
         return np.argmax(next_V)
 
-    def trace_update(self, e: np.ndarray, observation: np.ndarray, discount: float, lambd: float) -> np.ndarray:
+    @final
+    def trace_update(self, e: np.ndarray, observation: np.ndarray, discount: float, lambd: float, **kwargs) -> np.ndarray:
         '''
         资格迹更新（累积迹）
 
@@ -134,6 +143,10 @@ class AbstractAgent:
             γ折扣，例如除了游戏结束时取0以外全取0.99
         lambd :
             资格迹所需的λ值。省略即是智能体内存储的结果
+        rho :
+            仅在使用强调资格迹更新时需要。异策略时，目标策略π与行动策略b选取对应动作概率之比，同策略时为1
+        i :
+            仅在使用强调资格迹更新时需要。对当前局面的感兴趣程度，均匀感兴趣时可全部取1
 
         异常
         ------
@@ -151,8 +164,33 @@ class AbstractAgent:
             e = self.e
         if lambd is None:
             lambd = self.lambd
+        if self.trace_update_mode not in meta_data["trace_update_mode"]:
+            warnings.warn(
+                f"不支持的资格迹更新方式{self.trace_update_mode}！将改为conventional")
+            self.trace_update_mode = "conventional"
 
-        return discount*lambd*e+observation
+        return self._trace_update(e, observation, discount, lambd, **kwargs)
+
+    def _trace_update(self, e: np.ndarray, observation: np.ndarray, discount: float, lambd: float, **kwargs) -> np.ndarray:
+        '''
+        内部函数。用于实现具体的资格迹更新算法。
+        '''
+        if self.trace_update_mode == "conventional":
+            return discount*lambd*e+observation
+        else:
+            return self._emphatic_trace_update(e, observation, discount, lambd, **kwargs)
+
+    def _emphatic_trace_update(self, e: np.ndarray, observation: np.ndarray, discount: float, lambd: float, rho: float = 1., i: float = 1.) -> np.ndarray:
+        '''
+        内部函数。用于实现具体的强调资格迹更新算法。
+        '''
+        if not (isinstance(rho, (float, int)) and isinstance(i, (float, int))):
+            raise TypeError("参数类型不正确！")
+
+        self.F = rho*discount*self.F+i
+        self.M = lambd*i+(1-lambd)*self.F
+
+        return rho*(discount*lambd*e+self.M*observation)
 
 
 class TDAgent(AbstractAgent):
@@ -168,9 +206,6 @@ class TDAgent(AbstractAgent):
     def __init__(self, lr, **kwargs) -> None:
         super().__init__(**kwargs)
         self.lr = lr
-
-    def reset(self) -> None:
-        self.e = np.zeros(self.observation_space_n)
 
     def _learn(
         self,
@@ -206,8 +241,8 @@ class PlainATDAgent(AbstractAgent):
         self.alpha = alpha
 
     def reset(self) -> None:
+        super().reset()
         self.A = np.zeros((self.observation_space_n, self.observation_space_n))
-        self.e = np.zeros(self.observation_space_n)
 
     def _learn(
         self,
@@ -255,11 +290,11 @@ class SVDATDAgent(AbstractAgent):
         self.alpha = alpha
 
     def reset(self) -> None:
+        super().reset()
         self.U = np.empty((self.observation_space_n, 0))
         self.V = np.empty((self.observation_space_n, 0))
         self.L, self.R, self.Sigma = np.empty(
             (0, 0)), np.empty((0, 0)), np.empty((0, 0))
-        self.e = np.zeros(self.observation_space_n)
 
     def SVD_update(
         self,
