@@ -351,7 +351,7 @@ class SVDATDAgent(AbstractAgent):
         '''
         r, l, alpha, beta = [], [], [], []
         # 任取一个单位向量
-        r.append(np.eye(K.shape[0], 1))
+        r.append(np.ones((K.shape[0], 1))/K.shape[0])
 
         for j in range(K.shape[0]):
             l.append(K@r[j])
