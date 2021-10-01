@@ -6,6 +6,13 @@ PlainATDAgent updates $\mathbf{A}$ directly while SVDATDAgent updates its singul
 I also implemented a conventional Gradient Temporal Difference called TDAgent. I tested them in the Random Walking Environment and the result is [here](https://github.com/VEXLife/Accelerated-TD/blob/main/figures/random_walking.png):
 ![random_walking](https://user-images.githubusercontent.com/36587232/135572306-a48211e0-69fd-4fe9-8048-7414c011b643.png)
 
-To test it yourself, just clone the repository and run `python algorithm_test/random_walk.py`
+To test it yourself, just clone the repository and run `python algorithm_test/random_walk.py`. :)
+
+# Requirements
+
+- Python>=3.8
+- NumPy>=1.19
+- Matplotlib>=3.3.3 if you want to run my test script
+- Tqdm if you want to run my test script
 
 Reference: [Gahring 2016](https://arxiv.org/pdf/1611.09328.pdf)
