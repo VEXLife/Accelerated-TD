@@ -367,7 +367,7 @@ class SVDATDAgent(AbstractAgent):
             r[j+1] = r[j+1] / beta[j] if beta[j] > 0 else np.array([[1]])
 
         L2, Sigma, R2 = np.linalg.svd(
-            np.diagflat(alpha)+np.diagflat(beta[:-1], 1)) # 通过α和β构造双对角矩阵再奇异值分解
+            np.diagflat(alpha)+np.diagflat(beta[:-1], 1))  # 通过α和β构造双对角矩阵再奇异值分解
         L1, R1 = np.array(l)[:, :, 0].T, np.array(r[:-1])[:, :, 0].T
         return L1@L2, np.diagflat(Sigma), R1@R2
 
@@ -391,11 +391,14 @@ class SVDATDAgent(AbstractAgent):
                 np.sqrt(beta)*self.e.reshape((self.observation_space_n, 1)),
                 np.sqrt(beta)*(observation-discount *
                                next_observation).reshape((self.observation_space_n, 1))
-            ) # 使用奇异值更新代替直接更新A来降低计算复杂度，提高性能
+            )  # 使用奇异值更新代替直接更新A来降低计算复杂度，提高性能
 
-        self.w += (self.alpha*beta*self.V@np.linalg.pinv(self.Sigma) @
-                   self.U.transpose() + self.eta *
-                   np.eye(self.observation_space_n))@(delta*self.e)
+        # 参考论文降低了复杂度。原本直接按公式更新应如下：
+        # self.w += (self.alpha*beta*self.V@np.linalg.pinv(self.Sigma) @
+        #            self.U.transpose() + self.eta *
+        #            np.eye(self.observation_space_n))@(delta*self.e)
+        self.w += self.alpha*beta*self.V@(np.linalg.pinv(self.Sigma) @ (
+            self.U.transpose()@(delta*self.e))) + self.eta * delta*self.e
 
         return delta
 
