@@ -1,5 +1,6 @@
 # coding=utf-8
 # 作者：BWLL
+# 算法的主体实现
 
 from typing import Any, Iterable, Tuple, Type, final
 import warnings
