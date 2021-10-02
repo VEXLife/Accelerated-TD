@@ -3,15 +3,20 @@
 # 算法的主体实现
 
 import warnings
-from typing import Any, Iterable, Tuple, final
+from typing import Any, Iterable, Optional, Tuple, Union, final
 
 import numpy as np
 
-meta_data = {"trace_update_mode": ["conventional", "emphatic"]}  # 元数据
+meta_data = {"trace_update_mode": ["conventional", "emphatic"],
+             "w_update_emphasizes": ["complexity", "accuracy"]}  # 元数据
+Number = Union[float, int]
 
 
 class AbstractAgent:
     '''
+    AbstractAgent
+    ======
+
     抽象的智能体类，提供基本的一些功能。
 
     参数
@@ -26,7 +31,7 @@ class AbstractAgent:
         资格迹更新方式，取值``conventional | emphatic``。默认为传统方式(``conventional``)
     '''
 
-    def __init__(self, observation_space_n: int, action_space_n: int, lambd: float = 0, trace_update_mode="conventional") -> None:
+    def __init__(self, observation_space_n: int, action_space_n: int, lambd: Optional[float] = 0, trace_update_mode: Optional[str] = "conventional") -> None:
         self.observation_space_n = observation_space_n
         self.action_space_n = action_space_n
         self.lambd = lambd
@@ -92,8 +97,8 @@ class AbstractAgent:
         self,
         observation: np.ndarray,
         next_observation: np.ndarray,
-        reward: float,
-        discount: float,
+        reward: Number,
+        discount: Number,
         t: int
     ) -> Any:
         '''
@@ -101,14 +106,14 @@ class AbstractAgent:
         '''
         raise NotImplementedError("智能体不可训练。")
 
-    def decide(self, next_observations: Iterable) -> int:
+    def decide(self, next_observations: Iterable[np.ndarray]) -> int:
         '''
         让智能体决策一步。
 
         参数
         ------
-        next_observation :
-            下一个局面
+        next_observations :
+            各个动作执行后下一个局面构成的列表
 
         返回
         ------
@@ -123,13 +128,13 @@ class AbstractAgent:
             next_V = [self.w @ next_observation
                       for next_observation in next_observations]
         except ValueError:
-            print("发生错误，或许是输入的局面数据形状不正确？")
+            print("发生错误，或许是输入的数据不正确？")
             return -1
 
         return np.argmax(next_V)
 
     @final
-    def trace_update(self, e: np.ndarray, observation: np.ndarray, discount: float, lambd: float, **kwargs) -> np.ndarray:
+    def trace_update(self, e: Union[None, np.ndarray], observation: np.ndarray, discount: Number, lambd: Union[None, Number], **kwargs) -> np.ndarray:
         '''
         资格迹更新（累积迹）
 
@@ -171,16 +176,16 @@ class AbstractAgent:
 
         return self._trace_update(e, observation, discount, lambd, **kwargs)
 
-    def _trace_update(self, e: np.ndarray, observation: np.ndarray, discount: float, lambd: float, **kwargs) -> np.ndarray:
+    def _trace_update(self, e: Union[None, np.ndarray], observation: np.ndarray, discount: Number, lambd: Union[None, Number], **kwargs) -> np.ndarray:
         '''
         内部函数。用于实现具体的资格迹更新算法。
         '''
         if self.trace_update_mode == "conventional":
             return discount*lambd*e+observation
-        else:
+        elif self.trace_update_mode == "emphatic":
             return self._emphatic_trace_update(e, observation, discount, lambd, **kwargs)
 
-    def _emphatic_trace_update(self, e: np.ndarray, observation: np.ndarray, discount: float, lambd: float, rho: float = 1., i: float = 1.) -> np.ndarray:
+    def _emphatic_trace_update(self,  e: Union[None, np.ndarray], observation: np.ndarray, discount: Number, lambd: Union[None, Number],  rho: Optional[Number] = 1., i: Optional[Number] = 1.) -> np.ndarray:
         '''
         内部函数。用于实现具体的强调资格迹更新算法。
         '''
@@ -195,6 +200,9 @@ class AbstractAgent:
 
 class TDAgent(AbstractAgent):
     '''
+    TDAgent
+    ======
+
     经典时序差分算法。
 
     参数
@@ -203,7 +211,7 @@ class TDAgent(AbstractAgent):
         学习率
     '''
 
-    def __init__(self, lr, **kwargs) -> None:
+    def __init__(self, lr: Number, **kwargs) -> None:
         super().__init__(**kwargs)
         self.lr = lr
 
@@ -211,8 +219,8 @@ class TDAgent(AbstractAgent):
         self,
         observation: np.ndarray,
         next_observation: np.ndarray,
-        reward: float,
-        discount: float,
+        reward: Number,
+        discount: Number,
         t: int
     ) -> Any:
         self.e = self.trace_update(
@@ -225,6 +233,9 @@ class TDAgent(AbstractAgent):
 
 class PlainATDAgent(AbstractAgent):
     '''
+    PlainATDAgent
+    ======
+
     直白的加速的时序差分算法(ATD)。
 
     参数
@@ -235,7 +246,7 @@ class PlainATDAgent(AbstractAgent):
         半梯度均方投影贝尔曼误差(MSPBE)学习率
     '''
 
-    def __init__(self, eta, alpha=1, **kwargs) -> None:
+    def __init__(self, eta: Number, alpha=1, **kwargs) -> None:
         super().__init__(**kwargs)
         self.eta = eta
         self.alpha = alpha
@@ -248,8 +259,8 @@ class PlainATDAgent(AbstractAgent):
         self,
         observation: np.ndarray,
         next_observation: np.ndarray,
-        reward: float,
-        discount: float,
+        reward: Number,
+        discount: Number,
         t: int
     ) -> Any:
         beta = 1/(t+1)  # 因为这个量要频繁地用到，所以定义成β
@@ -270,33 +281,47 @@ class PlainATDAgent(AbstractAgent):
 
 class SVDATDAgent(AbstractAgent):
     '''
+    SVDATDAgent
+    ======
+
     基于奇异值分解(SVD)加速的时序差分算法(ATD)。
-    这个算法尚未完工。
 
     参数
     ------
     eta :
         半梯度时序差分(TD)学习率
-    k :
-        最大允许的矩阵大小(k*k)
     alpha :
         半梯度均方投影贝尔曼误差(MSPBE)学习率
+    w_update_emphasizes ：
+        权重更新时更注重哪个。可选值：``accuracy(精确度) | complexity(复杂度)``
     '''
 
-    def __init__(self, eta, k, alpha=1, **kwargs) -> None:
+    def __init__(self, eta, alpha=1, w_update_emphasizes="accuracy", **kwargs) -> None:
         super().__init__(**kwargs)
-        self.k = k
         self.eta = eta
         self.alpha = alpha
+        self.w_update_emphasizes = w_update_emphasizes
 
     def reset(self) -> None:
         super().reset()
-        self.U = np.empty((self.observation_space_n, 0))
-        self.V = np.empty((self.observation_space_n, 0))
-        self.L, self.R, self.Sigma = np.empty(
-            (0, 0)), np.empty((0, 0)), np.empty((0, 0))
+        self.U, self.V, self.Sigma = np.empty(
+            (self.observation_space_n, 0)), np.empty((self.observation_space_n, 0)), np.empty((0, 0))
 
-    def SVD_update(
+    def extendWith000(self, mat: np.ndarray) -> np.ndarray:
+        '''
+        用于在二维张量mat周围补0
+        '''
+        return np.pad(mat, ((0, 1), (0, 1)))
+
+    def extendWith010(self, mat: np.ndarray) -> np.ndarray:
+        '''
+        在补0的基础上将右下角设为1
+        '''
+        mat_ = self.extendWith000(mat)
+        mat_[-1, -1] = 1
+        return mat_
+
+    def svd_update(
         self,
         U: np.ndarray,
         Sigma: np.ndarray,
@@ -317,8 +342,10 @@ class SVDATDAgent(AbstractAgent):
             矩阵V
         z :
             向量z
-        z :
+        d :
             向量d
+        epsilon :
+            一个很小的数，用于防止除以零
 
         返回
         ------
@@ -337,19 +364,103 @@ class SVDATDAgent(AbstractAgent):
         if U.ndim != 2 or Sigma.ndim != 2 or V.ndim != 2 or U.shape[1] != Sigma.shape[0] or V.shape[1] != Sigma.shape[1] or U.shape[0] != z.shape[0] or V.shape[0] != d.shape[0]:
             raise ValueError("无法处理的输入！")
 
-        def extendWith000(mat: np.ndarray):
-            '''
-            用于在二维张量mat周围补0
-            '''
-            return np.pad(mat, ((0, 1), (0, 1)))
+        m = U.T@z
+        p = z-U@m
+        n = V.T@d
+        q = d-V@n
 
-        def extendWith010(mat: np.ndarray):
-            '''
-            在补0的基础上将右下角设为1
-            '''
-            mat_ = extendWith000(mat)
-            mat_[-1, -1] = 1
-            return mat_
+        p_l2 = np.linalg.norm(p)
+        q_l2 = np.linalg.norm(q)
+
+        K = self.extendWith000(Sigma)+np.vstack((m, p_l2)
+                                                )@np.vstack((n, q_l2)).T
+
+        p = p/p_l2 if p_l2 > 0 else np.full_like(p, np.sqrt(1./p.size))
+        q = q/q_l2 if q_l2 > 0 else np.full_like(q, np.sqrt(1./q.size))
+        U = np.hstack((U, p))
+        V = np.hstack((V, q))
+
+        return U, K, V
+
+    def _learn(
+        self,
+        observation: np.ndarray,
+        next_observation: np.ndarray,
+        reward: Number,
+        discount: Number,
+        t: int
+    ) -> Any:
+        if self.w_update_emphasizes not in meta_data["w_update_emphasizes"]:
+            warnings.warn(
+                f"意外的权重更新方式{self.w_update_emphasizes}！将改为accuracy")
+            self.w_update_emphasizes = "accuracy"
+
+        beta = 1/(t+1)
+        delta = reward+discount*self.w@next_observation-self.w@observation
+        self.e = self.trace_update(self.e, observation, discount, self.lambd)
+
+        self.U, self.Sigma, self.V = \
+            self.svd_update(
+                self.U,
+                (1-beta)*self.Sigma,
+                self.V,
+                np.sqrt(beta)*self.e.reshape((self.observation_space_n, 1)),
+                np.sqrt(beta)*(observation-discount *
+                               next_observation).reshape((self.observation_space_n, 1))
+            )  # 使用奇异值更新代替直接更新A来降低计算复杂度，提高性能
+
+        # 参考论文降低了复杂度。
+        if self.w_update_emphasizes == "accuracy":
+            # 原本直接按公式更新：
+            self.w += (self.alpha*beta*np.linalg.pinv(self.U@self.Sigma @
+                                                      self.V.transpose(), rcond=1e-9) + self.eta *
+                       np.eye(self.observation_space_n))@(delta*self.e)
+        elif self.w_update_emphasizes == "complexity":
+            # 降低复杂度的更新方法：
+            self.w += self.alpha*beta*self.V@(np.linalg.pinv(self.Sigma, rcond=1e-9) @ (
+                self.U.transpose()@(delta*self.e))) + self.eta * delta*self.e
+
+        return delta
+
+
+class SVDLRATDAgent(SVDATDAgent):
+    '''
+    SVDLRATDAgent
+    ======
+
+    带有L、R矩阵双对角化分解的基于奇异值分解(SVD)加速的时序差分算法(ATD)。
+    这个算法尚未完工。
+
+    参数
+    ------
+    k :
+        最大允许的矩阵大小(k*k)
+    '''
+
+    def __init__(self, k, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.k = k
+
+    def reset(self) -> None:
+        super().reset()
+        self.L, self.R = np.empty((0, 0)), np.empty((0, 0))
+
+    def svd_update(
+        self,
+        U: np.ndarray,
+        Sigma: np.ndarray,
+        V: np.ndarray,
+        z: np.ndarray,
+        d: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        try:
+            U, Sigma, V, z, d = np.asarray(U), np.asarray(
+                Sigma), np.asarray(V), np.asarray(z), np.asarray(d)
+        except:
+            warnings.warn("不支持的类型！")
+            return U, Sigma, V
+        if U.ndim != 2 or Sigma.ndim != 2 or V.ndim != 2 or U.shape[1] != Sigma.shape[0] or V.shape[1] != Sigma.shape[1] or U.shape[0] != z.shape[0] or V.shape[0] != d.shape[0]:
+            raise ValueError("无法处理的输入！")
 
         m = self.L.T@U.T@z
         p = z-U@self.L@m
@@ -359,14 +470,15 @@ class SVDATDAgent(AbstractAgent):
         p_l2 = np.linalg.norm(p)
         q_l2 = np.linalg.norm(q)
 
-        K = extendWith000(Sigma)+np.vstack((m, p_l2))@np.vstack((n, q_l2)).T
+        K = self.extendWith000(Sigma)+np.vstack((m, p_l2)
+                                                )@np.vstack((n, q_l2)).T
 
         L_, Sigma, R_ = self._diagonalize(K)
 
-        self.L = extendWith010(self.L)@L_
-        self.R = extendWith010(self.R)@R_
-        p = p/p_l2
-        q = q/q_l2
+        self.L = self.extendWith010(self.L)@L_
+        self.R = self.extendWith010(self.R)@R_
+        p = p/p_l2 if p_l2 > 0 else np.full_like(p, np.sqrt(1./p.size))
+        q = q/q_l2 if q_l2 > 0 else np.full_like(q, np.sqrt(1./q.size))
         U = np.hstack((U, p))
         V = np.hstack((V, q))
 
@@ -380,13 +492,13 @@ class SVDATDAgent(AbstractAgent):
 
         return U, Sigma, V
 
-    def _diagonalize(self, K):
+    def _diagonalize(self, K: np.ndarray):
         '''
         内部函数，用于带有重正交的双对角化操作。
         '''
         r, l, alpha, beta = [], [], [], []
         # 任取一个单位向量
-        r.append(np.ones((K.shape[0], 1))/K.shape[0])
+        r.append(np.ones((K.shape[0], 1))/np.sqrt(K.shape[0]))
 
         for j in range(K.shape[0]):
             l.append(K@r[j])
@@ -403,42 +515,11 @@ class SVDATDAgent(AbstractAgent):
 
         L2, Sigma, R2 = np.linalg.svd(
             np.diagflat(alpha)+np.diagflat(beta[:-1], 1))  # 通过α和β构造双对角矩阵再奇异值分解
-        L1, R1 = np.array(l)[:, :, 0].T, np.array(r[:-1])[:, :, 0].T
+        L1, R1 = np.array(l)[..., 0].T, np.array(r[:-1])[..., 0].T
         return L1@L2, np.diagflat(Sigma), R1@R2
 
-    def _learn(
-        self,
-        observation: np.ndarray,
-        next_observation: np.ndarray,
-        reward: float,
-        discount: float,
-        t: int
-    ) -> Any:
-        beta = 1/(t+1)
-        delta = reward+discount*self.w@next_observation-self.w@observation
-        self.e = self.trace_update(self.e, observation, discount, self.lambd)
 
-        self.U, self.Sigma, self.V = \
-            self.SVD_update(
-                self.U,
-                (1-beta)*self.Sigma,
-                self.V,
-                np.sqrt(beta)*self.e.reshape((self.observation_space_n, 1)),
-                np.sqrt(beta)*(observation-discount *
-                               next_observation).reshape((self.observation_space_n, 1))
-            )  # 使用奇异值更新代替直接更新A来降低计算复杂度，提高性能
-
-        # 参考论文降低了复杂度。原本直接按公式更新应如下：
-        # self.w += (self.alpha*beta*self.V@np.linalg.pinv(self.Sigma) @
-        #            self.U.transpose() + self.eta *
-        #            np.eye(self.observation_space_n))@(delta*self.e)
-        self.w += self.alpha*beta*self.V@(np.linalg.pinv(self.Sigma) @ (
-            self.U.transpose()@(delta*self.e))) + self.eta * delta*self.e
-
-        return delta
-
-
-def _SVD_minibatch_update(U, Sigma, V, Z, D, r):
+def _SVD_minibatch_update(U: np.ndarray, Sigma: np.ndarray, V: np.ndarray, Z: np.ndarray, D: np.ndarray, r: int):
     '''
     批量奇异值更新，以备不时之需。
     '''
