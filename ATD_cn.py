@@ -462,10 +462,10 @@ class SVDLRATDAgent(SVDATDAgent):
         if U.ndim != 2 or Sigma.ndim != 2 or V.ndim != 2 or U.shape[1] != Sigma.shape[0] or V.shape[1] != Sigma.shape[1] or U.shape[0] != z.shape[0] or V.shape[0] != d.shape[0]:
             raise ValueError("无法处理的输入！")
 
-        m = self.L.T@U.T@z
-        p = z-U@self.L@m
-        n = self.R.T@V.T@d
-        q = d-V@self.R@n
+        m = self.L.T@(U.T@z)
+        p = z-U@(self.L@m)
+        n = self.R.T@(V.T@d)
+        q = d-V@(self.R@n)
 
         p_l2 = np.linalg.norm(p)
         q_l2 = np.linalg.norm(q)
