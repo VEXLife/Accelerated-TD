@@ -1,6 +1,18 @@
 # coding=utf-8
 # 作者：BWLL
-# 算法的主体实现
+'''
+ATD_cn
+======
+
+带有中文注释的算法的主体实现
+
+元数据
+------
+rcond :
+    由于计算精度问题，NumPy取逆将导致小误差被放大，
+    因此需要将所有小于``rcond``的数设为0以避免此问题。\n
+    默认值为1e-9
+'''
 
 import warnings
 from typing import Any, Iterable, Optional, Tuple, Union, final
@@ -8,8 +20,9 @@ from typing import Any, Iterable, Optional, Tuple, Union, final
 import numpy as np
 
 meta_data = {"trace_update_mode": ["conventional", "emphatic"],
-             "w_update_emphasizes": ["complexity", "accuracy"]}  # 元数据
-Number = Union[float, int]
+             "w_update_emphasizes": ["complexity", "accuracy"],
+             "rcond": 1e-9}  # 元数据
+Fraction = Union[float, int]
 
 
 class AbstractAgent:
@@ -31,7 +44,10 @@ class AbstractAgent:
         资格迹更新方式，取值``conventional | emphatic``。默认为传统方式(``conventional``)
     '''
 
-    def __init__(self, observation_space_n: int, action_space_n: int, lambd: Optional[float] = 0, trace_update_mode: Optional[str] = "conventional") -> None:
+    def __init__(self, observation_space_n: int, action_space_n: int, lambd: Optional[Fraction] = 0, trace_update_mode: Optional[str] = "conventional") -> None:
+        if not (isinstance(observation_space_n, int) and isinstance(action_space_n, int) and isinstance(lambd, Fraction.__args__) and isinstance(meta_data["rcond"], Fraction.__args__)):
+            raise TypeError("参数类型不正确！")
+
         self.observation_space_n = observation_space_n
         self.action_space_n = action_space_n
         self.lambd = lambd
@@ -85,7 +101,7 @@ class AbstractAgent:
             self.observation_space_n,), f"当前局面观测数据的形状不正确。应为({self.observation_space_n},)，而不是{observation.shape}"
         assert next_observation.shape == (
             self.observation_space_n,), f"下一个局面观测数据的形状不正确。应为({self.observation_space_n},)，而不是{next_observation.shape}"
-        if not (isinstance(reward, (float, int)) and isinstance(discount, (float, int)) and isinstance(
+        if not (isinstance(reward, Fraction.__args__) and isinstance(discount, Fraction.__args__) and isinstance(
                 t, int)):
             raise TypeError("参数类型不正确！")
         if not (t >= 0 and 0 <= discount <= 1):
@@ -97,8 +113,8 @@ class AbstractAgent:
         self,
         observation: np.ndarray,
         next_observation: np.ndarray,
-        reward: Number,
-        discount: Number,
+        reward: Fraction,
+        discount: Fraction,
         t: int
     ) -> Any:
         '''
@@ -134,7 +150,7 @@ class AbstractAgent:
         return np.argmax(next_V)
 
     @final
-    def trace_update(self, e: Union[None, np.ndarray], observation: np.ndarray, discount: Number, lambd: Union[None, Number], **kwargs) -> np.ndarray:
+    def trace_update(self, e: Union[None, np.ndarray], observation: np.ndarray, discount: Fraction, lambd: Union[None, Fraction], **kwargs) -> np.ndarray:
         '''
         资格迹更新（累积迹）
 
@@ -161,7 +177,7 @@ class AbstractAgent:
         '''
         assert observation.shape == (
             self.observation_space_n,), f"当前局面观测数据的形状不正确。应为({self.observation_space_n},)，而不是{observation.shape}"
-        if not (isinstance(discount, (float, int)) and isinstance(lambd, (float, int))):
+        if not (isinstance(discount, Fraction.__args__) and isinstance(lambd, Fraction.__args__)):
             raise TypeError("参数类型不正确！")
         if not 0 <= discount <= 1:
             raise ValueError("无效的γ折扣！")
@@ -176,7 +192,7 @@ class AbstractAgent:
 
         return self._trace_update(e, observation, discount, lambd, **kwargs)
 
-    def _trace_update(self, e: Union[None, np.ndarray], observation: np.ndarray, discount: Number, lambd: Union[None, Number], **kwargs) -> np.ndarray:
+    def _trace_update(self, e: Union[None, np.ndarray], observation: np.ndarray, discount: Fraction, lambd: Union[None, Fraction], **kwargs) -> np.ndarray:
         '''
         内部函数。用于实现具体的资格迹更新算法。
         '''
@@ -185,11 +201,11 @@ class AbstractAgent:
         elif self.trace_update_mode == "emphatic":
             return self._emphatic_trace_update(e, observation, discount, lambd, **kwargs)
 
-    def _emphatic_trace_update(self,  e: Union[None, np.ndarray], observation: np.ndarray, discount: Number, lambd: Union[None, Number],  rho: Optional[Number] = 1., i: Optional[Number] = 1.) -> np.ndarray:
+    def _emphatic_trace_update(self,  e: Union[None, np.ndarray], observation: np.ndarray, discount: Fraction, lambd: Union[None, Fraction],  rho: Optional[Fraction] = 1., i: Optional[Fraction] = 1.) -> np.ndarray:
         '''
         内部函数。用于实现具体的强调资格迹更新算法。
         '''
-        if not (isinstance(rho, (float, int)) and isinstance(i, (float, int))):
+        if not (isinstance(rho, Fraction.__args__) and isinstance(i, Fraction.__args__)):
             raise TypeError("参数类型不正确！")
 
         self.F = rho*discount*self.F+i
@@ -211,16 +227,19 @@ class TDAgent(AbstractAgent):
         学习率
     '''
 
-    def __init__(self, lr: Number, **kwargs) -> None:
+    def __init__(self, lr: Fraction, **kwargs) -> None:
         super().__init__(**kwargs)
+        if not isinstance(lr, Fraction.__args__):
+            raise TypeError("参数类型不正确！")
+
         self.lr = lr
 
     def _learn(
         self,
         observation: np.ndarray,
         next_observation: np.ndarray,
-        reward: Number,
-        discount: Number,
+        reward: Fraction,
+        discount: Fraction,
         t: int
     ) -> Any:
         self.e = self.trace_update(
@@ -246,8 +265,11 @@ class PlainATDAgent(AbstractAgent):
         半梯度均方投影贝尔曼误差(MSPBE)学习率
     '''
 
-    def __init__(self, eta: Number, alpha=1, **kwargs) -> None:
+    def __init__(self, eta: Fraction, alpha: Optional[Fraction] = 1, **kwargs) -> None:
         super().__init__(**kwargs)
+        if not (isinstance(eta, Fraction.__args__) and isinstance(alpha, Fraction.__args__)):
+            raise TypeError("参数类型不正确！")
+
         self.eta = eta
         self.alpha = alpha
 
@@ -259,8 +281,8 @@ class PlainATDAgent(AbstractAgent):
         self,
         observation: np.ndarray,
         next_observation: np.ndarray,
-        reward: Number,
-        discount: Number,
+        reward: Fraction,
+        discount: Fraction,
         t: int
     ) -> Any:
         beta = 1/(t+1)  # 因为这个量要频繁地用到，所以定义成β
@@ -272,7 +294,7 @@ class PlainATDAgent(AbstractAgent):
         self.A = (1-beta)*self.A+beta*self.e.reshape((self.observation_space_n, 1))@(observation-discount *
                                                                                      next_observation).reshape((1, self.observation_space_n))
 
-        self.w += (self.alpha*beta*np.linalg.pinv(self.A) + self.eta *
+        self.w += (self.alpha*beta*np.linalg.pinv(self.A, rcond=meta_data["rcond"]) + self.eta *
                    np.eye(self.observation_space_n))@(delta*self.e)  # 按照论文中的式子更新权重
         # 原始式使用的是1/(1+t)，这里换成了beta
 
@@ -296,8 +318,12 @@ class SVDATDAgent(AbstractAgent):
         权重更新时更注重哪个。可选值：``accuracy(精确度) | complexity(复杂度)``
     '''
 
-    def __init__(self, eta, alpha=1, w_update_emphasizes="accuracy", **kwargs) -> None:
+    def __init__(self, eta: Fraction, alpha: Optional[Fraction] = 1,
+                 w_update_emphasizes: Optional[str] = "accuracy", **kwargs) -> None:
         super().__init__(**kwargs)
+        if not (isinstance(eta, Fraction.__args__) and isinstance(alpha, Fraction.__args__)):
+            raise TypeError("参数类型不正确！")
+
         self.eta = eta
         self.alpha = alpha
         self.w_update_emphasizes = w_update_emphasizes
@@ -386,8 +412,8 @@ class SVDATDAgent(AbstractAgent):
         self,
         observation: np.ndarray,
         next_observation: np.ndarray,
-        reward: Number,
-        discount: Number,
+        reward: Fraction,
+        discount: Fraction,
         t: int
     ) -> Any:
         if self.w_update_emphasizes not in meta_data["w_update_emphasizes"]:
@@ -413,11 +439,11 @@ class SVDATDAgent(AbstractAgent):
         if self.w_update_emphasizes == "accuracy":
             # 原本直接按公式更新：
             self.w += (self.alpha*beta*np.linalg.pinv(self.U@self.Sigma @
-                                                      self.V.transpose(), rcond=1e-9) + self.eta *
+                                                      self.V.transpose(), rcond=meta_data["rcond"]) + self.eta *
                        np.eye(self.observation_space_n))@(delta*self.e)
         elif self.w_update_emphasizes == "complexity":
             # 降低复杂度的更新方法：
-            self.w += self.alpha*beta*self.V@(np.linalg.pinv(self.Sigma, rcond=1e-9) @ (
+            self.w += self.alpha*beta*self.V@(np.linalg.pinv(self.Sigma, rcond=meta_data["rcond"]) @ (
                 self.U.transpose()@(delta*self.e))) + self.eta * delta*self.e
 
         return delta
@@ -437,8 +463,11 @@ class SVDLRATDAgent(SVDATDAgent):
         最大允许的矩阵大小(k*k)
     '''
 
-    def __init__(self, k, **kwargs) -> None:
+    def __init__(self, k: int, **kwargs) -> None:
         super().__init__(**kwargs)
+        if not isinstance(k, int):
+            raise TypeError("参数类型不正确！")
+
         self.k = k
 
     def reset(self) -> None:
