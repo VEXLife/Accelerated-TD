@@ -7,7 +7,7 @@ from tqdm import trange
 import matplotlib.pyplot as plt
 import sys
 
-sys.path.append("..")
+sys.path.append(".")
 from ATD_cn import TDAgent, SVDATDAgent,SVDLRATDAgent, PlainATDAgent
 
 N = 7
@@ -70,4 +70,4 @@ plt.title("Random Walking")
 plt.xlabel("Episode")
 plt.ylabel("RMSE")
 plt.ylim(0, 10)
-plt.savefig("../figures/random_walking.png", format="png")
+plt.savefig("./figures/random_walking.png", format="png")
