@@ -1,6 +1,6 @@
 # Accelerated-TD
 
-This is my implementation of the Accelerated Gradient Temporal Difference Learning algorithm in Python.
+This is my implementation of the Accelerated Gradient Temporal Difference Learning algorithm (ATD) in Python.
 
 `PlainATDAgent` updates ![](https://latex.codecogs.com/svg.image?\mathbf{A}) directly while `SVDATDAgent` and `SVDLRATDAgent` update its singular value decompositions respectively which is thought to have a fewer complexity. The difference between `SVDATDAgent` and `SVDLRATDAgent` is that `SVDATDAgent` employs the method mentioned here: [Brand 2006](https://pdf.sciencedirectassets.com/271586/1-s2.0-S0024379506X04573/1-s2.0-S0024379505003812/main.pdf), and `SVDLRATDAgent` adopted the method mentioned here: [Gahring 2015](https://arxiv.org/pdf/1511.08495) though I still can't figure out how it works.
 I also implemented a conventional Gradient Temporal Difference called `TDAgent`. I tested them in the Random Walking Environment and the result is [here](https://github.com/VEXLife/Accelerated-TD/blob/main/figures/random_walking.png):
