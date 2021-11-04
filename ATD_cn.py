@@ -154,8 +154,8 @@ class AbstractAgent:
         return np.argmax(next_v)
 
     @final
-    def trace_update(self, e: Union[None, np.ndarray], observation: np.ndarray, discount: Fraction,
-                     lambd: Union[None, Fraction], **kwargs) -> np.ndarray:
+    def trace_update(self, e: Optional[np.ndarray], observation: np.ndarray, discount: Fraction,
+                     lambd: Optional[Fraction], **kwargs) -> np.ndarray:
         """
         资格迹更新（累积迹）
 
@@ -197,8 +197,8 @@ class AbstractAgent:
 
         return self._trace_update(e, observation, discount, lambd, **kwargs)
 
-    def _trace_update(self, e: Union[None, np.ndarray], observation: np.ndarray, discount: Fraction,
-                      lambd: Union[None, Fraction], **kwargs) -> np.ndarray:
+    def _trace_update(self, e: Optional[np.ndarray], observation: np.ndarray, discount: Fraction,
+                      lambd: Optional[Fraction], **kwargs) -> np.ndarray:
         """
         内部函数。用于实现具体的资格迹更新算法。
         """
@@ -207,8 +207,8 @@ class AbstractAgent:
         elif self.trace_update_mode == "emphatic":
             return self._emphatic_trace_update(e, observation, discount, lambd, **kwargs)
 
-    def _emphatic_trace_update(self, e: Union[None, np.ndarray], observation: np.ndarray, discount: Fraction,
-                               lambd: Union[None, Fraction], rho: Optional[Fraction] = 1.,
+    def _emphatic_trace_update(self, e: Optional[np.ndarray], observation: np.ndarray, discount: Fraction,
+                               lambd: Optional[Fraction], rho: Optional[Fraction] = 1.,
                                i: Optional[Fraction] = 1.) -> np.ndarray:
         """
         内部函数。用于实现具体的强调资格迹更新算法。
