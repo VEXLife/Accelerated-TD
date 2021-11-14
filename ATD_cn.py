@@ -15,8 +15,10 @@ Notes
 """
 
 import warnings
+
 try:
-    from typing import Any, Iterable, Optional, Tuple, Union, Callable, final
+    from typing import Any, Iterable, Optional, Tuple, Union, Callable, Dict, final
+    from abc import abstractmethod
 except ImportError:
     warnings.warn("未能引入类型提示库，可能是Python版本过低。")
 try:
@@ -25,10 +27,13 @@ except ImportError:
     raise ImportWarning("未能引入NumPy，是否未安装？")
     exit(-1)
 
-meta_data = {"trace_update_mode": ["conventional", "emphatic"],
+meta_data = {"trace_update_mode": {},
              "w_update_emphasizes": ["complexity", "accuracy"],
              "rcond": 1e-9}  # 元数据
 Fraction = Union[float, int]
+TraceUpdateFunction = Callable[[Any, Optional[np.ndarray], np.ndarray, Fraction,
+                                Optional[Fraction], Optional[Fraction],
+                                Optional[Fraction]], np.ndarray]
 
 
 def learn_func_wrapper(
@@ -63,6 +68,80 @@ def learn_func_wrapper(
     return _learn_func
 
 
+def register_trace_update_func(
+        mode_name: str
+) -> Callable[[TraceUpdateFunction], TraceUpdateFunction]:
+    """
+    注册资格迹更新函数的装饰器。
+    """
+
+    def _trace_update_func_wrapper(
+            func: TraceUpdateFunction
+    ) -> TraceUpdateFunction:
+        """
+        资格迹更新函数的装饰器，用于辅助检查输入数据。
+        """
+
+        if not callable(func):
+            raise ValueError("错误的装饰器用法或输入不是可调用的函数。")
+        if not isinstance(mode_name, str):
+            raise TypeError("错误的更新方式名称。")
+
+        def _trace_update_func(self, e: Optional[np.ndarray], observation: np.ndarray, discount: Fraction,
+                               lambd: Optional[Fraction], rho: Optional[Fraction] = 1.,
+                               i: Optional[Fraction] = 1.) -> np.ndarray:
+            """
+            资格迹更新（累积迹）。
+
+            Parameters
+            ------
+            e :
+                上一个资格迹。省略即是智能体内存储的结果
+            observation :
+                当前局面
+            discount :
+                γ折扣，例如除了游戏结束时取0以外全取0.99
+            lambd :
+                资格迹所需的λ值。省略即是智能体内存储的结果
+            rho :
+                仅在使用强调资格迹更新时需要。异策略时，目标策略π与行动策略b选取对应动作概率之比，同策略时为1
+            i :
+                仅在使用强调资格迹更新时需要。对当前局面的感兴趣程度，均匀感兴趣时可全部取1
+
+            Returns
+            ------
+            np.ndarray
+                新的资格迹
+
+            Raises
+            ------
+            AssertionError
+                输入的形状不正确
+            TypeError
+                参数类型不正确
+            ValueError
+                γ折扣无效
+            """
+
+            assert observation.shape == (
+                self.observation_space_n,), f"当前局面观测数据的形状不正确。应为({self.observation_space_n},)，而不是{observation.shape}"
+            if not (isinstance(discount, Fraction.__args__) and isinstance(lambd, Fraction.__args__)):
+                raise TypeError("参数类型不正确！")
+            if not 0 <= discount <= 1:
+                raise ValueError("无效的γ折扣！")
+            if e is None:
+                e = self.e
+            if lambd is None:
+                lambd = self.lambd
+
+            return func(self=self, e=e, observation=observation, discount=discount, lambd=lambd, rho=rho, i=i)
+
+        meta_data["trace_update_mode"][mode_name] = _trace_update_func
+        return _trace_update_func
+
+    return _trace_update_func_wrapper
+
+
 class AbstractAgent:
     """
     AbstractAgent
@@ -87,13 +166,18 @@ class AbstractAgent:
         if not (isinstance(observation_space_n, int)
                 and isinstance(action_space_n, int)
                 and isinstance(lambd, Fraction.__args__)
-                and isinstance(meta_data["rcond"], Fraction.__args__)):
+                and isinstance(meta_data["rcond"], Fraction.__args__)
+                and isinstance(trace_update_mode, str)):
             raise TypeError("参数类型不正确！")
+        if trace_update_mode not in meta_data["trace_update_mode"].keys():
+            warnings.warn(
+                f"不支持的资格迹更新方式{trace_update_mode}！将改为conventional")
+            trace_update_mode = "conventional"
 
         self.observation_space_n = observation_space_n
         self.action_space_n = action_space_n
         self.lambd = lambd
-        self.trace_update_mode = trace_update_mode
+        self.trace_update = meta_data["trace_update_mode"][trace_update_mode]
 
         self.reinit()
         self.reset()
@@ -112,7 +196,7 @@ class AbstractAgent:
         self.M = 0
         self.e = np.zeros(self.observation_space_n)
 
-    @learn_func_wrapper
+    @abstractmethod
     def learn(
             self,
             observation: np.ndarray,
@@ -174,6 +258,9 @@ class AbstractAgent:
         ValueError
             意外的错误
         """
+        warnings.simplefilter("default", DeprecationWarning)
+        warnings.warn("未经测试的功能！", category=DeprecationWarning)
+
         try:
             next_v = [self.w @ next_observation
                       for next_observation in next_observations]
@@ -183,71 +270,20 @@ class AbstractAgent:
 
         return np.argmax(next_v)
 
-    @final
-    def trace_update(self, e: Optional[np.ndarray], observation: np.ndarray, discount: Fraction,
-                     lambd: Optional[Fraction], **kwargs) -> np.ndarray:
-        """
-        资格迹更新（累积迹）。
-
-        Parameters
-        ------
-        e :
-            上一个资格迹。省略即是智能体内存储的结果
-        observation :
-            当前局面
-        discount :
-            γ折扣，例如除了游戏结束时取0以外全取0.99
-        lambd :
-            资格迹所需的λ值。省略即是智能体内存储的结果
-        rho :
-            仅在使用强调资格迹更新时需要。异策略时，目标策略π与行动策略b选取对应动作概率之比，同策略时为1
-        i :
-            仅在使用强调资格迹更新时需要。对当前局面的感兴趣程度，均匀感兴趣时可全部取1
-
-        Returns
-        ------
-        np.ndarray
-            新的资格迹
-
-        Raises
-        ------
-        AssertionError
-            输入的形状不正确
-        TypeError
-            参数类型不正确
-        ValueError
-            γ折扣无效
-        """
-        assert observation.shape == (
-            self.observation_space_n,), f"当前局面观测数据的形状不正确。应为({self.observation_space_n},)，而不是{observation.shape}"
-        if not (isinstance(discount, Fraction.__args__) and isinstance(lambd, Fraction.__args__)):
-            raise TypeError("参数类型不正确！")
-        if not 0 <= discount <= 1:
-            raise ValueError("无效的γ折扣！")
-        if e is None:
-            e = self.e
-        if lambd is None:
-            lambd = self.lambd
-        if self.trace_update_mode not in meta_data["trace_update_mode"]:
-            warnings.warn(
-                f"不支持的资格迹更新方式{self.trace_update_mode}！将改为conventional")
-            self.trace_update_mode = "conventional"
-
-        return self.__trace_update(e, observation, discount, lambd, **kwargs)
-
-    def __trace_update(self, e: Optional[np.ndarray], observation: np.ndarray, discount: Fraction,
+    @staticmethod
+    @register_trace_update_func("conventional")
+    def __trace_update(*, self, e: Optional[np.ndarray], observation: np.ndarray, discount: Fraction,
                        lambd: Optional[Fraction], **kwargs) -> np.ndarray:
         """
-        内部函数。用于实现具体的资格迹更新算法。
+        内部函数。用于实现具体的经典资格迹更新算法。
         """
-        if self.trace_update_mode == "conventional":
-            return discount * lambd * e + observation
-        elif self.trace_update_mode == "emphatic":
-            return self.__emphatic_trace_update(e, observation, discount, lambd, **kwargs)
+        return discount * lambd * e + observation
 
-    def __emphatic_trace_update(self, e: Optional[np.ndarray], observation: np.ndarray, discount: Fraction,
+    @staticmethod
+    @register_trace_update_func("emphatic")
+    def __emphatic_trace_update(*, self, e: Optional[np.ndarray], observation: np.ndarray, discount: Fraction,
                                 lambd: Optional[Fraction], rho: Optional[Fraction] = 1.,
-                                i: Optional[Fraction] = 1.) -> np.ndarray:
+                                i: Optional[Fraction] = 1., **kwargs) -> np.ndarray:
         """
         内部函数。用于实现具体的强调资格迹更新算法。
         """
@@ -289,8 +325,7 @@ class TDAgent(AbstractAgent):
             discount: Fraction,
             t: int
     ) -> Any:
-        self.e = self.trace_update(
-            self.e, observation, discount, self.lambd)  # 更新资格迹
+        self.e = self.trace_update(self, self.e, observation, discount, self.lambd)  # 更新资格迹
         delta = reward + discount * self.w @ next_observation - self.w @ observation  # 计算时序差分误差
         self.w += self.lr * delta * self.e  # 更新权重
 
@@ -335,8 +370,7 @@ class PlainATDAgent(AbstractAgent):
     ) -> Any:
         beta = 1 / (t + 1)  # 因为这个量要频繁地用到，所以定义成β
         delta = reward + discount * self.w @ next_observation - self.w @ observation  # 计算时序差分误差
-        self.e = self.trace_update(
-            self.e, observation, discount, self.lambd)  # 更新资格迹
+        self.e = self.trace_update(self, self.e, observation, discount, self.lambd)  # 更新资格迹
 
         # 求出A矩阵。A矩阵应是期望值，为了减少计算量，采取渐进式的更新方法
         self.A = (1 - beta) * self.A + beta * self.e.reshape((self.observation_space_n, 1)) \
@@ -475,7 +509,7 @@ class SVDATDAgent(AbstractAgent):
     ) -> Any:
         beta = 1 / (t + 1)
         delta = reward + discount * self.w @ next_observation - self.w @ observation
-        self.e = self.trace_update(self.e, observation, discount, self.lambd)
+        self.e = self.trace_update(self, self.e, observation, discount, self.lambd)
 
         self.U, self.Sigma, self.V = \
             self.svd_update(
@@ -657,7 +691,7 @@ class DiagonalizedSVDATDAgent(SVDATDAgent):
 
         beta = 1 / (t + 1)
         delta = reward + discount * self.w @ next_observation - self.w @ observation
-        self.e = self.trace_update(self.e, observation, discount, self.lambd)
+        self.e = self.trace_update(self, self.e, observation, discount, self.lambd)
 
         self.U, self.Sigma, self.V = \
             self.svd_update(
