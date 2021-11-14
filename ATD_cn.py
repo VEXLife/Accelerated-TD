@@ -13,16 +13,30 @@ Notes
     因此需要将所有小于 ``rcond`` 的数设为0以避免此问题。\n
     默认值为 :math:`1\\times 10^{-9}`
 """
-
+import sys
 import warnings
 
+if sys.version_info < (3, 8):
+    warnings.warn("检测到Python版本过低！", category=ImportWarning)
+
 try:
-    from typing import Any, Iterable, Optional, Tuple, Union, Callable, Dict, final
+    from typing import Any, Iterable, Optional, Tuple, Union, Callable, final
     from abc import abstractmethod
 except ImportError:
-    warnings.warn("未能引入类型提示库，可能是Python版本过低。")
+    warnings.warn("未能引入类型提示库，可能是Python版本过低。", category=ImportWarning)
+
+
+    def original_decorator(obj: Callable) -> Callable:
+        return obj
+
+
+    abstractmethod = final = original_decorator
+    Any = Iterable = Optional = Tuple = Union = Callable = None
 try:
     import numpy as np
+
+    if np.__version__ < "1.19.0":
+        warnings.warn(f"NumPy版本{np.__version__}可能过低。", category=ImportWarning)
 except ImportError:
     raise ImportWarning("未能引入NumPy，是否未安装？")
     exit(-1)
@@ -46,7 +60,7 @@ def learn_func_wrapper(
         raise ValueError("错误的装饰器用法或输入不是可调用的函数。")
 
     def _learn_func(
-            self,
+            self: AbstractAgent,
             observation: np.ndarray,
             next_observation: np.ndarray,
             reward: float,
@@ -57,8 +71,8 @@ def learn_func_wrapper(
             self.observation_space_n,), f"当前局面观测数据的形状不正确。应为({self.observation_space_n},)，而不是{observation.shape}"
         assert next_observation.shape == (
             self.observation_space_n,), f"下一个局面观测数据的形状不正确。应为({self.observation_space_n},)，而不是{next_observation.shape}"
-        if not (isinstance(reward, Fraction.__args__) and isinstance(discount, Fraction.__args__) and isinstance(
-                t, int)):
+        if not (isinstance(reward, Fraction.__args__) and isinstance(discount, Fraction.__args__)
+                and isinstance(t, int) and isinstance(self, AbstractAgent)):
             raise TypeError("参数类型不正确！")
         if not (t >= 0 and 0 <= discount <= 1):
             raise ValueError("无效的参数！")
@@ -87,12 +101,14 @@ def register_trace_update_func(
         if not isinstance(mode_name, str):
             raise TypeError("错误的更新方式名称。")
 
-        def _trace_update_func(self, e: Optional[np.ndarray], observation: np.ndarray, discount: Fraction,
+        def _trace_update_func(self: Any, e: Optional[np.ndarray], observation: np.ndarray,
+                               discount: Fraction,
                                lambd: Optional[Fraction], rho: Optional[Fraction] = 1.,
                                i: Optional[Fraction] = 1.) -> np.ndarray:
             assert observation.shape == (
                 self.observation_space_n,), f"当前局面观测数据的形状不正确。应为({self.observation_space_n},)，而不是{observation.shape}"
-            if not (isinstance(discount, Fraction.__args__) and isinstance(lambd, Fraction.__args__)):
+            if not (isinstance(discount, Fraction.__args__) and isinstance(lambd, Fraction.__args__)
+                    and isinstance(self, AbstractAgent)):
                 raise TypeError("参数类型不正确！")
             if not 0 <= discount <= 1:
                 raise ValueError("无效的γ折扣！")
