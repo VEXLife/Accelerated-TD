@@ -90,39 +90,6 @@ def register_trace_update_func(
         def _trace_update_func(self, e: Optional[np.ndarray], observation: np.ndarray, discount: Fraction,
                                lambd: Optional[Fraction], rho: Optional[Fraction] = 1.,
                                i: Optional[Fraction] = 1.) -> np.ndarray:
-            """
-            资格迹更新（累积迹）。
-
-            Parameters
-            ------
-            e :
-                上一个资格迹。省略即是智能体内存储的结果
-            observation :
-                当前局面
-            discount :
-                γ折扣，例如除了游戏结束时取0以外全取0.99
-            lambd :
-                资格迹所需的λ值。省略即是智能体内存储的结果
-            rho :
-                仅在使用强调资格迹更新时需要。异策略时，目标策略π与行动策略b选取对应动作概率之比，同策略时为1
-            i :
-                仅在使用强调资格迹更新时需要。对当前局面的感兴趣程度，均匀感兴趣时可全部取1
-
-            Returns
-            ------
-            np.ndarray
-                新的资格迹
-
-            Raises
-            ------
-            AssertionError
-                输入的形状不正确
-            TypeError
-                参数类型不正确
-            ValueError
-                γ折扣无效
-            """
-
             assert observation.shape == (
                 self.observation_space_n,), f"当前局面观测数据的形状不正确。应为({self.observation_space_n},)，而不是{observation.shape}"
             if not (isinstance(discount, Fraction.__args__) and isinstance(lambd, Fraction.__args__)):
@@ -269,6 +236,49 @@ class AbstractAgent:
             return -1
 
         return np.argmax(next_v)
+
+    @staticmethod
+    @final
+    def trace_update(self, e: Optional[np.ndarray], observation: np.ndarray, discount: Fraction,
+                     lambd: Optional[Fraction], rho: Optional[Fraction] = 1.,
+                     i: Optional[Fraction] = 1.) -> np.ndarray:
+        """
+        资格迹更新（累积迹）。
+        若欲加入自己的资格迹更新算法，请不要直接重写此函数，而是定义新的函数，
+        并添加 `@staticmethod` 和 `@register_trace_update_func("<资格迹算法名称>")` 装饰器。
+
+        Parameters
+        ------
+        self :
+            被操作的智能体对象
+        e :
+            上一个资格迹。省略即是智能体内存储的结果
+        observation :
+            当前局面
+        discount :
+            γ折扣，例如除了游戏结束时取0以外全取0.99
+        lambd :
+            资格迹所需的λ值。省略即是智能体内存储的结果
+        rho :
+            仅在使用强调资格迹更新时需要。异策略时，目标策略π与行动策略b选取对应动作概率之比，同策略时为1
+        i :
+            仅在使用强调资格迹更新时需要。对当前局面的感兴趣程度，均匀感兴趣时可全部取1
+
+        Returns
+        ------
+        np.ndarray
+            新的资格迹
+
+        Raises
+        ------
+        AssertionError
+            输入的形状不正确
+        TypeError
+            参数类型不正确
+        ValueError
+            γ折扣无效
+        """
+        ...
 
     @staticmethod
     @register_trace_update_func("conventional")
