@@ -712,7 +712,7 @@ class DiagonalizedSVDATDAgent(SVDATDAgent):
     ) -> Any:
         if self.w_update_emphasizes not in meta_data["w_update_emphasizes"]:
             warnings.warn(
-                f"意外的权重更新方式{self.w_update_emphasizes}！将改为accuracy")
+                f"意外的权重更新方式{self.w_update_emphasizes}！将改为accuracy。")
             self.w_update_emphasizes = "accuracy"
 
         beta = 1 / (t + 1)
