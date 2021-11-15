@@ -52,7 +52,7 @@ plt.plot(play_game(agent=TDAgent(lr=0.1, lambd=0, observation_space_n=4, action_
 plt.plot(play_game(agent=DiagonalizedSVDATDAgent(k=30, eta=1e-4, lambd=0, observation_space_n=4,
                                                  action_space_n=2),
                    iterations=1),
-         label="DiagonalizedSVDATD(0), $\\alpha=\\frac{1}{1+t}$, \n$\\eta=1\\times10^{-4}$, $r=50$, Accuracy First")
+         label="DiagonalizedSVDATD(0), $\\alpha=\\frac{1}{1+t}$, \n$\\eta=1\\times10^{-4}$, $r=30$, Accuracy First")
 plt.plot(play_game(agent=DiagonalizedSVDATDAgent(k=30, eta=1e-4, lambd=0, observation_space_n=4,
                                                  action_space_n=2, svd_diagonalizing=False,
                                                  w_update_emphasizes="complexity"),
