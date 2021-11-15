@@ -21,14 +21,14 @@ To test it yourself, just clone the repository and run `python algorithm_test/<r
 This environment is from [Sutton's book](http://incompleteideas.net/book/RLbook2020.pdf).
 
 The code file is [this](https://github.com/VEXLife/Accelerated-TD/blob/main/algorithm_test/random_walk.py) and the result is [here](https://github.com/VEXLife/Accelerated-TD/blob/main/figures/random_walk.png):
-![random_walk](https://user-images.githubusercontent.com/36587232/141800646-7b4c2c80-922f-4dd3-a0b0-ed955fd17128.png)
+![random_walk](https://user-images.githubusercontent.com/36587232/141802348-08e20308-d5b2-4011-8655-3a89045f0eb5.png)
 
 ## Boyan's Chain
 
 The environment was proposed by Boyan, but I don't have a direct link to his article.
 
 The code file is [this](https://github.com/VEXLife/Accelerated-TD/blob/main/algorithm_test/boyans_chain.py) and the result is [here](https://github.com/VEXLife/Accelerated-TD/blob/main/figures/boyans_chain.png):
-![boyans_chain](https://user-images.githubusercontent.com/36587232/141800637-11675872-cf4c-4803-b7a5-66b9471fb5a9.png)
+![boyans_chain](https://user-images.githubusercontent.com/36587232/141802337-e345e59a-f856-49e7-b660-84dce14eea94.png)
 
 # Usage
 
