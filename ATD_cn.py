@@ -20,7 +20,7 @@ if sys.version_info < (3, 8):
     warnings.warn("检测到Python版本过低！", category=ImportWarning)
 
 try:
-    from typing import Any, Iterable, Optional, Tuple, Union, Callable, final
+    from typing import Any, Iterable, Optional, Tuple, Union, Callable, Dict, Final, final
     from abc import abstractmethod
 except ImportError:
     warnings.warn("未能引入类型提示库，可能是Python版本过低。", category=ImportWarning)
@@ -31,23 +31,23 @@ except ImportError:
 
 
     abstractmethod = final = original_decorator
-    Any = Iterable = Optional = Tuple = Union = Callable = None
+    Any = Iterable = Optional = Tuple = Union = Callable = Dict = Final = None
 try:
     import numpy as np
 
     if np.__version__ < "1.19.0":
         warnings.warn(f"NumPy版本{np.__version__}可能过低。", category=ImportWarning)
 except ImportError:
-    raise ImportWarning("未能引入NumPy，是否未安装？")
+    raise ImportError("未能引入NumPy，是否未安装？")
     exit(-1)
 
-meta_data = {"trace_update_mode": {},
-             "w_update_emphasizes": ["complexity", "accuracy"],
-             "rcond": 1e-9}  # 元数据
-Fraction = Union[float, int]
-TraceUpdateFunction = Callable[[Any, Optional[np.ndarray], np.ndarray, Fraction,
-                                Optional[Fraction], Optional[Fraction],
-                                Optional[Fraction]], np.ndarray]
+meta_data: Dict = {"trace_update_mode": {},
+                   "w_update_emphasizes": ["complexity", "accuracy"],
+                   "rcond": 1e-9}  # 元数据
+Fraction: Final = Union[float, int]
+TraceUpdateFunction: Final = Callable[[Any, np.ndarray, Fraction, Optional[np.ndarray],
+                                       Optional[Fraction], Optional[Fraction],
+                                       Optional[Fraction]], np.ndarray]
 
 
 def learn_func_wrapper(
@@ -77,6 +77,8 @@ def learn_func_wrapper(
         if not (t >= 0 and 0 <= discount <= 1):
             raise ValueError("无效的参数！")
 
+        self.lr = self.lr_func(t)  # 计算新的学习率
+
         return func(self, observation, next_observation, reward, discount, t)
 
     return _learn_func
@@ -101,8 +103,8 @@ def register_trace_update_func(
         if not isinstance(mode_name, str):
             raise TypeError("错误的更新方式名称。")
 
-        def _trace_update_func(self: Any, e: Optional[np.ndarray], observation: np.ndarray,
-                               discount: Fraction,
+        def _trace_update_func(self: Any, observation: np.ndarray,
+                               discount: Fraction, e: Optional[np.ndarray],
                                lambd: Optional[Fraction], rho: Optional[Fraction] = 1.,
                                i: Optional[Fraction] = 1.) -> np.ndarray:
             assert observation.shape == (
@@ -117,7 +119,7 @@ def register_trace_update_func(
             if lambd is None:
                 lambd = self.lambd
 
-            return func(self=self, e=e, observation=observation, discount=discount, lambd=lambd, rho=rho, i=i)
+            return func(self=self, observation=observation, discount=discount, e=e, lambd=lambd, rho=rho, i=i)
 
         meta_data["trace_update_mode"][mode_name] = _trace_update_func
         return _trace_update_func
@@ -138,13 +140,23 @@ class AbstractAgent:
         观测空间大小
     action_space_n :
         动作空间大小
+    lr :
+        学习率，可以是一个接受时间步作为参数，输出相应学习率的函数，或是一个浮点小数表示常数学习率
     lambd :
         资格迹所需的λ值
     trace_update_mode :
         资格迹更新方式，取值 ``conventional | emphatic`` 。默认为传统方式( ``conventional`` )
+
+    Raises
+    ------
+    TypeError
+        参数类型不正确
+    AssertionError
+        无法处理的学习率参数
     """
 
-    def __init__(self, observation_space_n: int, action_space_n: int, lambd: Optional[Fraction] = 0,
+    def __init__(self, observation_space_n: int, action_space_n: int,
+                 lr: Union[Callable[[int], Fraction], Fraction], lambd: Optional[Fraction] = 0,
                  trace_update_mode: Optional[str] = "conventional") -> None:
         if not (isinstance(observation_space_n, int)
                 and isinstance(action_space_n, int)
@@ -154,13 +166,18 @@ class AbstractAgent:
             raise TypeError("参数类型不正确！")
         if trace_update_mode not in meta_data["trace_update_mode"].keys():
             warnings.warn(
-                f"不支持的资格迹更新方式{trace_update_mode}！将改为conventional")
+                f"不支持的资格迹更新方式{trace_update_mode}！将改为conventional。")
             trace_update_mode = "conventional"
+        if isinstance(lr, Fraction.__args__):
+            self.lr_func = lambda t: lr
+        else:
+            assert callable(lr), "无法处理的学习率参数！"
+            self.lr_func = lr
 
         self.observation_space_n = observation_space_n
         self.action_space_n = action_space_n
         self.lambd = lambd
-        self.trace_update = meta_data["trace_update_mode"][trace_update_mode]
+        self.trace_update = meta_data["trace_update_mode"][trace_update_mode]  # type: TraceUpdateFunction
 
         self.reinit()
         self.reset()
@@ -189,7 +206,7 @@ class AbstractAgent:
             t: int
     ) -> Any:
         """
-        训练智能体。这个函数应当装配 `learn_func_wrapper` 装饰器检查输入。
+        训练智能体。这个函数应当装配 ``@learn_func_wrapper`` 装饰器检查输入。
 
         Parameters
         ------
@@ -255,13 +272,13 @@ class AbstractAgent:
 
     @staticmethod
     @final
-    def trace_update(self, e: Optional[np.ndarray], observation: np.ndarray, discount: Fraction,
-                     lambd: Optional[Fraction], rho: Optional[Fraction] = 1.,
+    def trace_update(self, observation: np.ndarray, discount: Fraction, e: Optional[np.ndarray] = None,
+                     lambd: Optional[Fraction] = None, rho: Optional[Fraction] = 1.,
                      i: Optional[Fraction] = 1.) -> np.ndarray:
         """
         资格迹更新（累积迹）。
         若欲加入自己的资格迹更新算法，请不要直接重写此函数，而是定义新的函数，
-        并添加 `@staticmethod` 和 `@register_trace_update_func("<资格迹算法名称>")` 装饰器。
+        并添加 ``@staticmethod`` 和 ``@register_trace_update_func("<资格迹算法名称>")`` 装饰器。
 
         Parameters
         ------
@@ -298,8 +315,8 @@ class AbstractAgent:
 
     @staticmethod
     @register_trace_update_func("conventional")
-    def __trace_update(*, self, e: Optional[np.ndarray], observation: np.ndarray, discount: Fraction,
-                       lambd: Optional[Fraction], **kwargs) -> np.ndarray:
+    def __trace_update(*, self, observation: np.ndarray, discount: Fraction, e: Optional[np.ndarray] = None,
+                       lambd: Optional[Fraction] = None, **kwargs) -> np.ndarray:
         """
         内部函数。用于实现具体的经典资格迹更新算法。
         """
@@ -307,8 +324,8 @@ class AbstractAgent:
 
     @staticmethod
     @register_trace_update_func("emphatic")
-    def __emphatic_trace_update(*, self, e: Optional[np.ndarray], observation: np.ndarray, discount: Fraction,
-                                lambd: Optional[Fraction], rho: Optional[Fraction] = 1.,
+    def __emphatic_trace_update(*, self, observation: np.ndarray, discount: Fraction, e: Optional[np.ndarray] = None,
+                                lambd: Optional[Fraction] = None, rho: Optional[Fraction] = 1.,
                                 i: Optional[Fraction] = 1., **kwargs) -> np.ndarray:
         """
         内部函数。用于实现具体的强调资格迹更新算法。
@@ -329,18 +346,10 @@ class TDAgent(AbstractAgent):
 
     经典时序差分算法。
 
-    Parameters
+    See Also
     ------
-    lr :
-        学习率
+    ``TDAgent``
     """
-
-    def __init__(self, lr: Fraction, **kwargs) -> None:
-        super().__init__(**kwargs)
-        if not isinstance(lr, Fraction.__args__):
-            raise TypeError("参数类型不正确！")
-
-        self.lr = lr
 
     @learn_func_wrapper
     def learn(
@@ -351,7 +360,7 @@ class TDAgent(AbstractAgent):
             discount: Fraction,
             t: int
     ) -> Any:
-        self.e = self.trace_update(self, self.e, observation, discount, self.lambd)  # 更新资格迹
+        self.e = self.trace_update(self, observation, discount, self.e, self.lambd)  # 更新资格迹
         delta = reward + discount * self.w @ next_observation - self.w @ observation  # 计算时序差分误差
         self.w += self.lr * delta * self.e  # 更新权重
 
@@ -369,17 +378,19 @@ class PlainATDAgent(AbstractAgent):
     ------
     eta :
         半梯度时序差分(TD)学习率
-    alpha :
+    lr :
         半梯度均方投影贝尔曼误差(MSPBE)学习率
     """
 
-    def __init__(self, eta: Fraction, alpha: Optional[Fraction] = 1, **kwargs) -> None:
-        super().__init__(**kwargs)
-        if not (isinstance(eta, Fraction.__args__) and isinstance(alpha, Fraction.__args__)):
+    def __init__(self,
+                 eta: Fraction,
+                 lr: Optional[Union[Callable[[int], Fraction], Fraction]] = lambda t: 1 / (t + 1),
+                 **kwargs) -> None:
+        super().__init__(lr=lr, **kwargs)
+        if not (isinstance(eta, Fraction.__args__)):
             raise TypeError("参数类型不正确！")
 
         self.eta = eta
-        self.alpha = alpha
 
     def reinit(self) -> None:
         super(PlainATDAgent, self).reinit()
@@ -396,13 +407,13 @@ class PlainATDAgent(AbstractAgent):
     ) -> Any:
         beta = 1 / (t + 1)  # 因为这个量要频繁地用到，所以定义成β
         delta = reward + discount * self.w @ next_observation - self.w @ observation  # 计算时序差分误差
-        self.e = self.trace_update(self, self.e, observation, discount, self.lambd)  # 更新资格迹
+        self.e = self.trace_update(self, observation, discount, self.e, self.lambd)  # 更新资格迹
 
         # 求出A矩阵。A矩阵应是期望值，为了减少计算量，采取渐进式的更新方法
         self.A = (1 - beta) * self.A + beta * self.e.reshape((self.observation_space_n, 1)) \
                  @ (observation - discount * next_observation).reshape((1, self.observation_space_n))
 
-        self.w += (self.alpha * beta * np.linalg.pinv(self.A, rcond=meta_data["rcond"]) + self.eta *
+        self.w += (self.lr * np.linalg.pinv(self.A, rcond=meta_data["rcond"]) + self.eta *
                    np.eye(self.observation_space_n)) @ (delta * self.e)  # 按照论文中的式子更新权重
         # 原始式使用的是1/(1+t)，这里换成了beta
 
@@ -420,17 +431,23 @@ class SVDATDAgent(AbstractAgent):
     ------
     eta :
         半梯度时序差分(TD)学习率
-    alpha :
+    lr :
         半梯度均方投影贝尔曼误差(MSPBE)学习率
+
+    See Also
+    ------
+    ``PlainATDAgent``
     """
 
-    def __init__(self, eta: Fraction, alpha: Optional[Fraction] = 1, **kwargs) -> None:
-        super().__init__(**kwargs)
-        if not (isinstance(eta, Fraction.__args__) and isinstance(alpha, Fraction.__args__)):
+    def __init__(self,
+                 eta: Fraction,
+                 lr: Optional[Union[Callable[[int], Fraction], Fraction]] = lambda t: 1 / (t + 1),
+                 **kwargs) -> None:
+        super().__init__(lr=lr, **kwargs)
+        if not (isinstance(eta, Fraction.__args__)):
             raise TypeError("参数类型不正确！")
 
         self.eta = eta
-        self.alpha = alpha
 
     def reinit(self) -> None:
         super(SVDATDAgent, self).reinit()
@@ -535,7 +552,7 @@ class SVDATDAgent(AbstractAgent):
     ) -> Any:
         beta = 1 / (t + 1)
         delta = reward + discount * self.w @ next_observation - self.w @ observation
-        self.e = self.trace_update(self, self.e, observation, discount, self.lambd)
+        self.e = self.trace_update(self, observation, discount, self.e, self.lambd)
 
         self.U, self.Sigma, self.V = \
             self.svd_update(
@@ -547,7 +564,7 @@ class SVDATDAgent(AbstractAgent):
                                  next_observation).reshape((self.observation_space_n, 1))
             )  # 使用奇异值更新代替直接更新A来降低计算复杂度，提高性能
 
-        self.w += (self.alpha * beta *
+        self.w += (self.lr *
                    np.linalg.pinv(self.U @ self.Sigma @ self.V.transpose(), rcond=meta_data["rcond"]) +
                    self.eta *
                    np.eye(self.observation_space_n)) @ (delta * self.e)
@@ -560,7 +577,7 @@ class DiagonalizedSVDATDAgent(SVDATDAgent):
     DiagonalizedSVDATDAgent
     ======
 
-    将矩阵 :math:`\\mathbf{\Sigma}` 对角化分解的基于奇异值分解(SVD)加速的时序差分算法(ATD)。
+    将矩阵 :math:`\\mathbf{\\Sigma}` 对角化分解的基于奇异值分解(SVD)加速的时序差分算法(ATD)。
 
     Parameters
     ------
@@ -717,7 +734,7 @@ class DiagonalizedSVDATDAgent(SVDATDAgent):
 
         beta = 1 / (t + 1)
         delta = reward + discount * self.w @ next_observation - self.w @ observation
-        self.e = self.trace_update(self, self.e, observation, discount, self.lambd)
+        self.e = self.trace_update(self, observation, discount, self.e, self.lambd)
 
         self.U, self.Sigma, self.V = \
             self.svd_update(
@@ -732,13 +749,13 @@ class DiagonalizedSVDATDAgent(SVDATDAgent):
         # 参考论文降低了复杂度。
         if self.w_update_emphasizes == "accuracy":
             # 原本直接按公式更新：
-            self.w += (self.alpha * beta *
+            self.w += (self.lr *
                        np.linalg.pinv(self.U @ self.L @ self.Sigma @ (self.V @ self.R).T, rcond=meta_data["rcond"]) +
                        self.eta *
                        np.eye(self.observation_space_n)) @ (delta * self.e)
         elif self.w_update_emphasizes == "complexity":
             # 降低复杂度的更新方法：
-            self.w += self.alpha * beta * self.V @ self.R @ (np.diagflat(
+            self.w += self.lr * self.V @ self.R @ (np.diagflat(
                 [(1 / sigma if abs(sigma) > meta_data["rcond"] else 0) for sigma in np.diagonal(self.Sigma)]
             ) @ (self.L.T @ (self.U.T @ (delta * self.e)))) + self.eta * delta * self.e
 

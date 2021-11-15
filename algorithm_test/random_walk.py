@@ -54,25 +54,25 @@ plt.figure(dpi=120, figsize=(8, 6))
 plt.plot(play_game(agent=TDAgent(lr=0.1, lambd=0.5, observation_space_n=7, action_space_n=2),
                    iterations=10, episodes=100), label="TD(0.5), $\\alpha=0.1$")
 plt.plot(play_game(
-    agent=DiagonalizedSVDATDAgent(alpha=1, k=30, eta=1e-4, lambd=0.5, observation_space_n=7, action_space_n=2),
+    agent=DiagonalizedSVDATDAgent(k=30, eta=1e-4, lambd=0.5, observation_space_n=7, action_space_n=2),
     iterations=10, episodes=100),
-         label="DiagonalizedSVDATD(0.5), $\\alpha=1$, \n$\\eta=1\\times10^{-4}$, $r=30$, Accuracy First")
-plt.plot(play_game(agent=DiagonalizedSVDATDAgent(alpha=1, k=30, eta=1e-4, lambd=0.5, observation_space_n=7,
+         label="DiagonalizedSVDATD(0.5), $\\alpha=\\frac{1}{1+t}$, \n$\\eta=1\\times10^{-4}$, $r=30$, Accuracy First")
+plt.plot(play_game(agent=DiagonalizedSVDATDAgent(k=30, eta=1e-4, lambd=0.5, observation_space_n=7,
                                                  action_space_n=2, svd_diagonalizing=False,
                                                  w_update_emphasizes="complexity"),
                    iterations=10, episodes=100),
-         label="DiagonalizedSVDATD(0.5), $\\alpha=1$, \n$\\eta=1\\times10^{-4}$, $r=30$, Complexity First")
-plt.plot(play_game(agent=DiagonalizedSVDATDAgent(alpha=1, k=30, eta=1e-4, lambd=0.5, observation_space_n=7,
+         label="DiagonalizedSVDATD(0.5), $\\alpha=\\frac{1}{1+t}$, \n$\\eta=1\\times10^{-4}$, $r=30$, Complexity First")
+plt.plot(play_game(agent=DiagonalizedSVDATDAgent(k=30, eta=1e-4, lambd=0.5, observation_space_n=7,
                                                  action_space_n=2, svd_diagonalizing=True,
                                                  w_update_emphasizes="complexity"),
                    iterations=10, episodes=100),
-         label="DiagonalizedSVDATD(0.5), $\\alpha=1$, \n$\\eta=1\\times10^{-4}$, $r=30$, Complexity First, \
+         label="DiagonalizedSVDATD(0.5), $\\alpha=\\frac{1}{1+t}$, \n$\\eta=1\\times10^{-4}$, $r=30$, Complexity First, \
          \nUsing SVD to diagonalize")
-plt.plot(play_game(agent=SVDATDAgent(alpha=1, eta=1e-4, lambd=0.5, observation_space_n=7, action_space_n=2),
+plt.plot(play_game(agent=SVDATDAgent(eta=1e-4, lambd=0.5, observation_space_n=7, action_space_n=2),
                    iterations=10, episodes=100),
-         label="SVDATD(0.5), $\\alpha=1$, $\\eta=1\\times10^{-4}$")
-plt.plot(play_game(agent=PlainATDAgent(alpha=1, eta=1e-4, lambd=0.5, observation_space_n=7, action_space_n=2),
-                   iterations=10, episodes=100), label="PlainATD(0.5), $\\alpha=1$, $\\eta=1\\times10^{-4}$")
+         label="SVDATD(0.5), $\\alpha=\\frac{1}{1+t}$, $\\eta=1\\times10^{-4}$")
+plt.plot(play_game(agent=PlainATDAgent(eta=1e-4, lambd=0.5, observation_space_n=7, action_space_n=2),
+                   iterations=10, episodes=100), label="PlainATD(0.5), $\\alpha=\\frac{1}{1+t}$, $\\eta=1\\times10^{-4}$")
 plt.legend()
 plt.title("Random Walking")
 plt.xlabel("Episode")
