@@ -17,7 +17,7 @@ To test it yourself, just clone the repository and run `python algorithm_test/<r
 
 - Python>=3.9
 - NumPy>=1.19
-- Torch>=1.10
+- Torch>=1.10 if you want to use PyTorch as backend
 - Matplotlib>=3.3.3 if you want to run my test script
 - Tqdm if you want to run my test script
 
