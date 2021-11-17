@@ -1,27 +1,31 @@
-# coding=utf-8
-# 作者：BWLL
+#!python
+# -*- coding: utf-8 -*-
+# @Author：BWLL
+
 """
-ATD_cn
+atd_cn
 ======
 
-带有中文注释的算法的主体实现。
+带有中文注释的算法的主体实现。现在，您可以通过设置环境变量“ATD_BACKEND”来选择要使用的后端。已支持NumPy、PyTorch(CPU)。
 
 Notes
 ------
 元数据 `rcond` :
     由于计算精度问题，取逆将导致小误差被放大，
     因此需要将所有小于 ``rcond`` 的数设为0以避免此问题。\n
-    默认值为 :math:`1\\times 10^{-9}`
+    默认值为 :math:`1\\times 10^{-7}`
 """
 import sys
 import warnings
+from math import sqrt
 
-if sys.version_info < (3, 8):
-    warnings.warn("检测到Python版本过低！", category=ImportWarning)
+if sys.version_info < (3, 9):
+    warnings.warn("检测到Python版本过低！部分功能可能无法正常运作。", category=ImportWarning)
 
 try:
-    from typing import Any, Iterable, Optional, Tuple, Union, Callable, Dict, Final, final
+    from typing import Any, Iterable, Optional, Tuple, Union, Callable, Final, final
     from abc import abstractmethod
+    from functools import wraps
 except ImportError:
     warnings.warn("未能引入类型提示库，可能是Python版本过低。", category=ImportWarning)
 
@@ -30,39 +34,41 @@ except ImportError:
         return obj
 
 
-    abstractmethod = final = original_decorator
-    Any = Iterable = Optional = Tuple = Union = Callable = Dict = Final = None
-try:
-    import numpy as np
+    abstractmethod = final = wraps = original_decorator
+    Any = Iterable = Optional = Tuple = Union = Callable = Final = None
 
-    if np.__version__ < "1.19.0":
-        warnings.warn(f"NumPy版本{np.__version__}可能过低。", category=ImportWarning)
+try:
+    if sys.version_info < (3, 10):
+        from backend_manager_39 import Backend, Matrix, Fraction, isinstance
+    else:
+        # 针对旧版本的支持
+        from backend_manager_310 import Backend, Matrix, Fraction
 except ImportError:
-    raise ImportError("未能引入NumPy，是否未安装？")
+    raise ImportError("未能引入指定的后端，是否未安装或是不支持的后端？")
     exit(-1)
 
-meta_data: Dict = {"trace_update_mode": {},
+meta_data: dict = {"trace_update_mode": {},
                    "w_update_emphasizes": ["complexity", "accuracy"],
-                   "rcond": 1e-9}  # 元数据
-Fraction: Final = Union[float, int]
-TraceUpdateFunction: Final = Callable[[Any, np.ndarray, Fraction, Optional[np.ndarray],
+                   "rcond": 1e-5}  # 元数据
+TraceUpdateFunction: Final = Callable[[Any, Matrix, Fraction, Optional[Matrix],
                                        Optional[Fraction], Optional[Fraction],
-                                       Optional[Fraction]], np.ndarray]
+                                       Optional[Fraction]], Matrix]
 
 
 def learn_func_wrapper(
-        func: Callable[[Any, np.ndarray, np.ndarray, float, float, int], Any]
-) -> Callable[[Any, np.ndarray, np.ndarray, float, float, int], Any]:
+        func: Callable[[Any, Matrix, Matrix, float, float, int], Any]
+) -> Callable[[Any, Matrix, Matrix, float, float, int], Any]:
     """
     学习函数的装饰器，用于辅助检查输入数据。
     """
     if not callable(func):
         raise ValueError("错误的装饰器用法或输入不是可调用的函数。")
 
+    @wraps(func)
     def _learn_func(
             self: AbstractAgent,
-            observation: np.ndarray,
-            next_observation: np.ndarray,
+            observation: Matrix,
+            next_observation: Matrix,
             reward: float,
             discount: float,
             t: int
@@ -71,7 +77,7 @@ def learn_func_wrapper(
             self.observation_space_n,), f"当前局面观测数据的形状不正确。应为({self.observation_space_n},)，而不是{observation.shape}"
         assert next_observation.shape == (
             self.observation_space_n,), f"下一个局面观测数据的形状不正确。应为({self.observation_space_n},)，而不是{next_observation.shape}"
-        if not (isinstance(reward, Fraction.__args__) and isinstance(discount, Fraction.__args__)
+        if not (isinstance(reward, Fraction) and isinstance(discount, Fraction)
                 and isinstance(t, int) and isinstance(self, AbstractAgent)):
             raise TypeError("参数类型不正确！")
         if not (t >= 0 and 0 <= discount <= 1):
@@ -103,13 +109,14 @@ def register_trace_update_func(
         if not isinstance(mode_name, str):
             raise TypeError("错误的更新方式名称。")
 
-        def _trace_update_func(self: Any, observation: np.ndarray,
-                               discount: Fraction, e: Optional[np.ndarray],
-                               lambd: Optional[Fraction], rho: Optional[Fraction] = 1.,
-                               i: Optional[Fraction] = 1.) -> np.ndarray:
+        @wraps(func)
+        def _trace_update_func(self: Any, observation: Matrix,
+                               discount: Fraction, e: Optional[Matrix] = None,
+                               lambd: Optional[Fraction] = None, rho: Optional[Fraction] = 1.,
+                               i: Optional[Fraction] = 1.) -> Matrix:
             assert observation.shape == (
                 self.observation_space_n,), f"当前局面观测数据的形状不正确。应为({self.observation_space_n},)，而不是{observation.shape}"
-            if not (isinstance(discount, Fraction.__args__) and isinstance(lambd, Fraction.__args__)
+            if not (isinstance(discount, Fraction) and isinstance(lambd, Fraction)
                     and isinstance(self, AbstractAgent)):
                 raise TypeError("参数类型不正确！")
             if not 0 <= discount <= 1:
@@ -160,15 +167,15 @@ class AbstractAgent:
                  trace_update_mode: Optional[str] = "conventional") -> None:
         if not (isinstance(observation_space_n, int)
                 and isinstance(action_space_n, int)
-                and isinstance(lambd, Fraction.__args__)
-                and isinstance(meta_data["rcond"], Fraction.__args__)
+                and isinstance(lambd, Fraction)
+                and isinstance(meta_data["rcond"], Fraction)
                 and isinstance(trace_update_mode, str)):
             raise TypeError("参数类型不正确！")
         if trace_update_mode not in meta_data["trace_update_mode"].keys():
             warnings.warn(
                 f"不支持的资格迹更新方式{trace_update_mode}！将改为conventional。")
             trace_update_mode = "conventional"
-        if isinstance(lr, Fraction.__args__):
+        if isinstance(lr, Fraction):
             self.lr_func = lambda t: lr
         else:
             assert callable(lr), "无法处理的学习率参数！"
@@ -186,7 +193,7 @@ class AbstractAgent:
         """
         让智能体忘记学到的东西。
         """
-        self.w = np.empty(self.observation_space_n)  # 任意地初始化权重
+        self.w = Backend.empty(self.observation_space_n)  # 任意地初始化权重
 
     def reset(self) -> None:
         """
@@ -194,13 +201,13 @@ class AbstractAgent:
         """
         self.F = 0
         self.M = 0
-        self.e = np.zeros(self.observation_space_n)
+        self.e = Backend.zeros(self.observation_space_n)
 
     @abstractmethod
     def learn(
             self,
-            observation: np.ndarray,
-            next_observation: np.ndarray,
+            observation: Matrix,
+            next_observation: Matrix,
             reward: Fraction,
             discount: Fraction,
             t: int
@@ -239,7 +246,7 @@ class AbstractAgent:
         """
         raise NotImplementedError("智能体不可训练。")
 
-    def decide(self, next_observations: Iterable[np.ndarray]) -> int:
+    def decide(self, next_observations: Iterable[Matrix]) -> int:
         """
         让智能体决策一步。
 
@@ -268,13 +275,13 @@ class AbstractAgent:
             print("发生错误，或许是输入的数据不正确？")
             return -1
 
-        return np.argmax(next_v)
+        return Backend.argmax(next_v)
 
     @staticmethod
     @final
-    def trace_update(self, observation: np.ndarray, discount: Fraction, e: Optional[np.ndarray] = None,
+    def trace_update(self, observation: Matrix, discount: Fraction, e: Optional[Matrix] = None,
                      lambd: Optional[Fraction] = None, rho: Optional[Fraction] = 1.,
-                     i: Optional[Fraction] = 1.) -> np.ndarray:
+                     i: Optional[Fraction] = 1.) -> Matrix:
         """
         资格迹更新（累积迹）。
         若欲加入自己的资格迹更新算法，请不要直接重写此函数，而是定义新的函数，
@@ -284,12 +291,12 @@ class AbstractAgent:
         ------
         self :
             被操作的智能体对象
-        e :
-            上一个资格迹。省略即是智能体内存储的结果
         observation :
             当前局面
         discount :
             γ折扣，例如除了游戏结束时取0以外全取0.99
+        e :
+            上一个资格迹。省略即是智能体内存储的结果
         lambd :
             资格迹所需的λ值。省略即是智能体内存储的结果
         rho :
@@ -299,7 +306,7 @@ class AbstractAgent:
 
         Returns
         ------
-        np.ndarray
+        Matrix
             新的资格迹
 
         Raises
@@ -315,8 +322,8 @@ class AbstractAgent:
 
     @staticmethod
     @register_trace_update_func("conventional")
-    def __trace_update(*, self, observation: np.ndarray, discount: Fraction, e: Optional[np.ndarray] = None,
-                       lambd: Optional[Fraction] = None, **kwargs) -> np.ndarray:
+    def __trace_update(*, self, observation: Matrix, discount: Fraction, e: Optional[Matrix] = None,
+                       lambd: Optional[Fraction] = None, **kwargs) -> Matrix:
         """
         内部函数。用于实现具体的经典资格迹更新算法。
         """
@@ -324,13 +331,13 @@ class AbstractAgent:
 
     @staticmethod
     @register_trace_update_func("emphatic")
-    def __emphatic_trace_update(*, self, observation: np.ndarray, discount: Fraction, e: Optional[np.ndarray] = None,
+    def __emphatic_trace_update(*, self, observation: Matrix, discount: Fraction, e: Optional[Matrix] = None,
                                 lambd: Optional[Fraction] = None, rho: Optional[Fraction] = 1.,
-                                i: Optional[Fraction] = 1., **kwargs) -> np.ndarray:
+                                i: Optional[Fraction] = 1., **kwargs) -> Matrix:
         """
         内部函数。用于实现具体的强调资格迹更新算法。
         """
-        if not (isinstance(rho, Fraction.__args__) and isinstance(i, Fraction.__args__)):
+        if not (isinstance(rho, Fraction) and isinstance(i, Fraction)):
             raise TypeError("参数类型不正确！")
 
         self.F = rho * discount * self.F + i
@@ -354,8 +361,8 @@ class TDAgent(AbstractAgent):
     @learn_func_wrapper
     def learn(
             self,
-            observation: np.ndarray,
-            next_observation: np.ndarray,
+            observation: Matrix,
+            next_observation: Matrix,
             reward: Fraction,
             discount: Fraction,
             t: int
@@ -387,20 +394,20 @@ class PlainATDAgent(AbstractAgent):
                  lr: Optional[Union[Callable[[int], Fraction], Fraction]] = lambda t: 1 / (t + 1),
                  **kwargs) -> None:
         super().__init__(lr=lr, **kwargs)
-        if not (isinstance(eta, Fraction.__args__)):
+        if not (isinstance(eta, Fraction)):
             raise TypeError("参数类型不正确！")
 
         self.eta = eta
 
     def reinit(self) -> None:
         super(PlainATDAgent, self).reinit()
-        self.A = np.zeros((self.observation_space_n, self.observation_space_n))
+        self.A = Backend.zeros((self.observation_space_n, self.observation_space_n))
 
     @learn_func_wrapper
     def learn(
             self,
-            observation: np.ndarray,
-            next_observation: np.ndarray,
+            observation: Matrix,
+            next_observation: Matrix,
             reward: Fraction,
             discount: Fraction,
             t: int
@@ -413,8 +420,8 @@ class PlainATDAgent(AbstractAgent):
         self.A = (1 - beta) * self.A + beta * self.e.reshape((self.observation_space_n, 1)) \
                  @ (observation - discount * next_observation).reshape((1, self.observation_space_n))
 
-        self.w += (self.lr * np.linalg.pinv(self.A, rcond=meta_data["rcond"]) + self.eta *
-                   np.eye(self.observation_space_n)) @ (delta * self.e)  # 按照论文中的式子更新权重
+        self.w += (self.lr * Backend.linalg.pinv(self.A, rcond=meta_data["rcond"]) + self.eta *
+                   Backend.eye(self.observation_space_n)) @ (delta * self.e)  # 按照论文中的式子更新权重
         # 原始式使用的是1/(1+t)，这里换成了beta
 
         return delta
@@ -444,23 +451,23 @@ class SVDATDAgent(AbstractAgent):
                  lr: Optional[Union[Callable[[int], Fraction], Fraction]] = lambda t: 1 / (t + 1),
                  **kwargs) -> None:
         super().__init__(lr=lr, **kwargs)
-        if not (isinstance(eta, Fraction.__args__)):
+        if not (isinstance(eta, Fraction)):
             raise TypeError("参数类型不正确！")
 
         self.eta = eta
 
     def reinit(self) -> None:
         super(SVDATDAgent, self).reinit()
-        self.U, self.V, self.Sigma = np.empty(
-            (self.observation_space_n, 0)), np.empty((self.observation_space_n, 0)), np.empty((0, 0))
+        self.U, self.V, self.Sigma = Backend.empty(
+            (self.observation_space_n, 0)), Backend.empty((self.observation_space_n, 0)), Backend.empty((0, 0))
 
-    def extendWith000(self, mat: np.ndarray) -> np.ndarray:
+    def extendWith000(self, mat: Matrix) -> Matrix:
         """
         用于在二维张量mat周围补0
         """
-        return np.pad(mat, ((0, 1), (0, 1)))
+        return Backend.pad(mat, ((0, 1), (0, 1)))
 
-    def extendWith010(self, mat: np.ndarray) -> np.ndarray:
+    def extendWith010(self, mat: Matrix) -> Matrix:
         """
         在补0的基础上将右下角设为1
         """
@@ -470,12 +477,12 @@ class SVDATDAgent(AbstractAgent):
 
     def svd_update(
             self,
-            U: np.ndarray,
-            Sigma: np.ndarray,
-            V: np.ndarray,
-            z: np.ndarray,
-            d: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+            U: Matrix,
+            Sigma: Matrix,
+            V: Matrix,
+            z: Matrix,
+            d: Matrix
+    ) -> Tuple[Matrix, Matrix, Matrix]:
         """
         奇异值分解(SVD)更新。它的效果近似等于
         :math:`\\mathbf{U}' \\mathbf{\\Sigma} '\\mathbf{V'}^\\top =
@@ -498,7 +505,7 @@ class SVDATDAgent(AbstractAgent):
 
         Returns
         ------
-        Tuple[np.ndarray, np.ndarray, np.ndarray]
+        Tuple[Matrix, Matrix, Matrix]
             新的U'、∑'、V'
 
         Raises
@@ -509,8 +516,9 @@ class SVDATDAgent(AbstractAgent):
             数据形状无法相乘
         """
         try:
-            U, Sigma, V, z, d = np.asarray(U), np.asarray(
-                Sigma), np.asarray(V), np.asarray(z), np.asarray(d)
+            U, Sigma, V, z, d = Backend.convert_to_matrix_func(U), Backend.convert_to_matrix_func(
+                Sigma), Backend.convert_to_matrix_func(V), Backend.convert_to_matrix_func(
+                z), Backend.convert_to_matrix_func(d)
         except TypeError:
             warnings.warn("不支持的类型！")
             return U, Sigma, V
@@ -528,24 +536,24 @@ class SVDATDAgent(AbstractAgent):
         n = V.T @ d
         q = d - V @ n
 
-        p_l2 = np.linalg.norm(p)
-        q_l2 = np.linalg.norm(q)
+        p_l2 = Backend.linalg.norm(p)
+        q_l2 = Backend.linalg.norm(q)
 
-        K = self.extendWith000(Sigma) + np.vstack((m, p_l2)
-                                                  ) @ np.vstack((n, q_l2)).T
+        K = self.extendWith000(Sigma) + Backend.vstack((m, p_l2)
+                                                       ) @ Backend.vstack((n, q_l2)).T
 
-        p = p / p_l2 if p_l2 > 0 else np.zeros_like(p)
-        q = q / q_l2 if q_l2 > 0 else np.zeros_like(q)
-        U = np.hstack((U, p))
-        V = np.hstack((V, q))
+        p = p / p_l2 if p_l2 > 0 else Backend.zeros_like(p)
+        q = q / q_l2 if q_l2 > 0 else Backend.zeros_like(q)
+        U = Backend.hstack((U, p))
+        V = Backend.hstack((V, q))
 
         return U, K, V
 
     @learn_func_wrapper
     def learn(
             self,
-            observation: np.ndarray,
-            next_observation: np.ndarray,
+            observation: Matrix,
+            next_observation: Matrix,
             reward: Fraction,
             discount: Fraction,
             t: int
@@ -559,15 +567,15 @@ class SVDATDAgent(AbstractAgent):
                 self.U,
                 (1 - beta) * self.Sigma,
                 self.V,
-                np.sqrt(beta) * self.e.reshape((self.observation_space_n, 1)),
-                np.sqrt(beta) * (observation - discount *
-                                 next_observation).reshape((self.observation_space_n, 1))
+                sqrt(beta) * self.e.reshape((self.observation_space_n, 1)),
+                sqrt(beta) * (observation - discount *
+                                      next_observation).reshape((self.observation_space_n, 1))
             )  # 使用奇异值更新代替直接更新A来降低计算复杂度，提高性能
 
         self.w += (self.lr *
-                   np.linalg.pinv(self.U @ self.Sigma @ self.V.transpose(), rcond=meta_data["rcond"]) +
+                   Backend.linalg.pinv(self.U @ self.Sigma @ self.V.T, rcond=meta_data["rcond"]) +
                    self.eta *
-                   np.eye(self.observation_space_n)) @ (delta * self.e)
+                   Backend.eye(self.observation_space_n)) @ (delta * self.e)
 
         return delta
 
@@ -602,19 +610,20 @@ class DiagonalizedSVDATDAgent(SVDATDAgent):
 
     def reinit(self) -> None:
         super(DiagonalizedSVDATDAgent, self).reinit()
-        self.L, self.R = np.empty((0, 0)), np.empty((0, 0))
+        self.L, self.R = Backend.empty((0, 0)), Backend.empty((0, 0))
 
     def svd_update(
             self,
-            U: np.ndarray,
-            Sigma: np.ndarray,
-            V: np.ndarray,
-            z: np.ndarray,
-            d: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+            U: Matrix,
+            Sigma: Matrix,
+            V: Matrix,
+            z: Matrix,
+            d: Matrix
+    ) -> Tuple[Matrix, Matrix, Matrix]:
         try:
-            U, Sigma, V, z, d = np.asarray(U), np.asarray(
-                Sigma), np.asarray(V), np.asarray(z), np.asarray(d)
+            U, Sigma, V, z, d = Backend.convert_to_matrix_func(U), Backend.convert_to_matrix_func(
+                Sigma), Backend.convert_to_matrix_func(V), Backend.convert_to_matrix_func(
+                z), Backend.convert_to_matrix_func(d)
         except TypeError:
             warnings.warn("不支持的类型！")
             return U, Sigma, V
@@ -634,25 +643,25 @@ class DiagonalizedSVDATDAgent(SVDATDAgent):
         n = self.R.T @ (V.T @ d)
         q = d - V @ (self.R @ n)
 
-        p_l2 = np.linalg.norm(p)
-        q_l2 = np.linalg.norm(q)
+        p_l2 = Backend.linalg.norm(p)
+        q_l2 = Backend.linalg.norm(q)
 
-        K = self.extendWith000(Sigma) + np.vstack((m, p_l2)
-                                                  ) @ np.vstack((n, q_l2)).T
+        K = self.extendWith000(Sigma) + Backend.vstack((m, p_l2)
+                                                       ) @ Backend.vstack((n, q_l2)).T
 
         if self.svd_diagonalizing:
-            L_, Sigma, R_ = np.linalg.svd(K)
-            Sigma = np.diagflat(Sigma)
+            L_, Sigma, R_ = Backend.linalg.svd(K)
+            Sigma = Backend.diagflat(Sigma)
             R_ = R_.T
         else:
             L_, Sigma, R_ = self.diagonalize(K)
 
         self.L = self.extendWith010(self.L) @ L_
         self.R = self.extendWith010(self.R) @ R_
-        p = p / p_l2 if p_l2 > meta_data["rcond"] else np.zeros_like(p)  # 向量很小时取零向量，因为零向量不会影响伪逆。
-        q = q / q_l2 if q_l2 > meta_data["rcond"] else np.zeros_like(q)
-        U = np.hstack((U, p))
-        V = np.hstack((V, q))
+        p = p / p_l2 if p_l2 > meta_data["rcond"] else Backend.zeros_like(p)  # 向量很小时取零向量，因为零向量不会影响伪逆。
+        q = q / q_l2 if q_l2 > meta_data["rcond"] else Backend.zeros_like(q)
+        U = Backend.hstack((U, p))
+        V = Backend.hstack((V, q))
 
         if self.L.shape[1] >= 2 * self.k:
             Sigma = Sigma[:self.k, :self.k]
@@ -660,23 +669,23 @@ class DiagonalizedSVDATDAgent(SVDATDAgent):
             U = U[:, :self.k]
             V = V @ self.R
             V = V[:, :self.k]
-            self.L, self.R = np.eye(self.k), np.eye(self.k)
+            self.L, self.R = Backend.eye(self.k), Backend.eye(self.k)
 
         return U, Sigma, V
 
     @staticmethod
-    def diagonalize(K: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def diagonalize(K: Matrix) -> Tuple[Matrix, Matrix, Matrix]:
         """
         将矩阵 :math:`\\mathbf{K}` 对角化，且是完全正交的。
 
         Parameters
         ------
-        K : np.ndarray
+        K : Matrix
             待被对角化的矩阵
 
         Returns
         ------
-        Tuple[np.ndarray, np.ndarray, np.ndarray]
+        Tuple[Matrix, Matrix, Matrix]
             对角化完毕的三个矩阵
 
         Raises
@@ -687,7 +696,7 @@ class DiagonalizedSVDATDAgent(SVDATDAgent):
             不支持的输入类型
         """
         try:
-            K = np.asarray(K)
+            K = Backend.convert_to_matrix_func(K)
         except TypeError:
             raise TypeError("不支持的类型！")
         if K.shape[0] != K.shape[1]:
@@ -695,34 +704,35 @@ class DiagonalizedSVDATDAgent(SVDATDAgent):
 
         r, l, alpha, beta = [], [], [], []
         # 任取一个单位向量
-        unit = np.full((K.shape[0], 1), 1 / np.sqrt(K.shape[0]))
+        unit = Backend.full((K.shape[0], 1), 1 / sqrt(K.shape[0]))
         r.append(unit)
 
         for j in range(K.shape[0]):
             l.append(K @ r[j])
             for i in range(j):
                 l[j] -= (l[i].T @ l[j]) * l[i]
-            alpha.append(np.linalg.norm(l[j]))
+            alpha.append(Backend.linalg.norm(l[j]))
             l[j] = l[j] / alpha[j] if alpha[j] > meta_data["rcond"] \
-                else np.zeros_like(l[j])  # 很小的向量基本都是由于误差引起，故直接置零。取零向量而不取其他向量的原因见上。下同。
+                else Backend.zeros_like(l[j])  # 很小的向量基本都是由于误差引起，故直接置零。取零向量而不取其他向量的原因见上。下同。
 
             r.append(K.T @ l[j])
             for i in range(j + 1):
                 r[j + 1] -= (r[i].T @ r[j + 1]) * r[i]
-            beta.append(np.linalg.norm(r[j + 1]))
+            beta.append(Backend.linalg.norm(r[j + 1]))
             r[j + 1] = r[j + 1] / beta[j] if beta[j] > meta_data["rcond"] \
-                else np.zeros_like(r[j + 1])
+                else Backend.zeros_like(r[j + 1])
 
-        L2, Sigma, R2 = np.linalg.svd(
-            np.diagflat(alpha) + np.diagflat(beta[:-1], 1))  # 通过α和β构造双对角矩阵再奇异值分解
-        L1, R1 = np.array(l)[..., 0].T, np.array(r[:-1])[..., 0].T
-        return L1 @ L2, np.diagflat(Sigma), R1 @ R2.T
+        L2, Sigma, R2 = Backend.linalg.svd(
+            Backend.diagflat(Backend.create_matrix_func(alpha))
+            + Backend.diagflat(Backend.create_matrix_func(beta[:-1]), 1))  # 通过α和β构造双对角矩阵再奇异值分解
+        L1, R1 = Backend.hstack(l), Backend.hstack(r[:-1])
+        return L1 @ L2, Backend.diagflat(Sigma), R1 @ R2.T
 
     @learn_func_wrapper
     def learn(
             self,
-            observation: np.ndarray,
-            next_observation: np.ndarray,
+            observation: Matrix,
+            next_observation: Matrix,
             reward: Fraction,
             discount: Fraction,
             t: int
@@ -741,49 +751,53 @@ class DiagonalizedSVDATDAgent(SVDATDAgent):
                 self.U,
                 (1 - beta) * self.Sigma,
                 self.V,
-                np.sqrt(beta) * self.e.reshape((self.observation_space_n, 1)),
-                np.sqrt(beta) * (observation - discount *
-                                 next_observation).reshape((self.observation_space_n, 1))
+                sqrt(beta) * self.e.reshape((self.observation_space_n, 1)),
+                sqrt(beta) * (observation - discount *
+                                      next_observation).reshape((self.observation_space_n, 1))
             )  # 使用奇异值更新代替直接更新A来降低计算复杂度，提高性能
 
         # 参考论文降低了复杂度。
         if self.w_update_emphasizes == "accuracy":
             # 原本直接按公式更新：
             self.w += (self.lr *
-                       np.linalg.pinv(self.U @ self.L @ self.Sigma @ (self.V @ self.R).T, rcond=meta_data["rcond"]) +
+                       Backend.linalg.pinv(self.U @ self.L @ self.Sigma @ (self.V @ self.R).T,
+                                           rcond=meta_data["rcond"]) +
                        self.eta *
-                       np.eye(self.observation_space_n)) @ (delta * self.e)
+                       Backend.eye(self.observation_space_n)) @ (delta * self.e)
         elif self.w_update_emphasizes == "complexity":
             # 降低复杂度的更新方法：
-            self.w += self.lr * self.V @ self.R @ (np.diagflat(
-                [(1 / sigma if abs(sigma) > meta_data["rcond"] else 0) for sigma in np.diagonal(self.Sigma)]
+            self.w += self.lr * self.V @ self.R @ (Backend.diagflat(
+                Backend.create_matrix_func(
+                    [(1 / sigma if abs(sigma) > meta_data["rcond"] else 0) for sigma in Backend.diagonal(self.Sigma)]
+                )
             ) @ (self.L.T @ (self.U.T @ (delta * self.e)))) + self.eta * delta * self.e
 
         return delta
 
 
 def _svd_minibatch_update(
-        U: np.ndarray,
-        Sigma: np.ndarray,
-        V: np.ndarray,
-        Z: np.ndarray,
-        D: np.ndarray, r: int
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        U: Matrix,
+        Sigma: Matrix,
+        V: Matrix,
+        Z: Matrix,
+        D: Matrix, r: int
+) -> Tuple[Matrix, Matrix, Matrix]:
     """
     批量奇异值更新，以备不时之需。
     """
 
-    Q_Z, R_Z = np.linalg.qr((1 - U @ U.transpose()) @ Z)
-    Q_D, R_D = np.linalg.qr((1 - V @ V.transpose()) @ D)
+    Q_Z, R_Z = Backend.linalg.qr((1 - U @ U.transpose()) @ Z)
+    Q_D, R_D = Backend.linalg.qr((1 - V @ V.transpose()) @ D)
 
-    K = np.pad(Sigma, ((0, 1), (0, 1))) + np.vstack((U.transpose() @ Z, R_Z)) @ np.vstack((V.transpose()
-                                                                                           @ D, R_D)).transpose()
+    K = Backend.pad(Sigma, ((0, 1), (0, 1))) + Backend.vstack((U.transpose() @ Z, R_Z)) @ Backend.vstack((V.transpose()
+                                                                                                          @ D,
+                                                                                                          R_D)).transpose()
 
-    L, Sigma_diagonalized, R = np.linalg.svd(K)
-    Sigma = np.diag(Sigma_diagonalized)
+    L, Sigma_diagonalized, R = Backend.linalg.svd(K)
+    Sigma = Backend.diag(Sigma_diagonalized)
 
-    U = np.hstack((U, Q_Z)) @ L
-    V = np.hstack((V, Q_D)) @ R
+    U = Backend.hstack((U, Q_Z)) @ L
+    V = Backend.hstack((V, Q_D)) @ R
 
     return U, Sigma, V
 

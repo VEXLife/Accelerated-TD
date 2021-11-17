@@ -1,17 +1,23 @@
-# coding=utf-8
-# Author: BWLL
+#!python
+# -*- coding: utf-8 -*-
+# @Author：BWLL
 # The Boyan's Chain Environment to test the algorithm
 
-from ATD_cn import TDAgent, SVDATDAgent, DiagonalizedSVDATDAgent, PlainATDAgent
+import sys
+
+sys.path.append(".")
+
+from atd_cn import TDAgent, SVDATDAgent, DiagonalizedSVDATDAgent, PlainATDAgent, Backend
 import numpy as np
 from tqdm import trange
 import matplotlib.pyplot as plt
 
-observations = [np.max(
-    ((1 - np.abs(12 - 4 * np.arange(4) - N) / 4), np.zeros(4)), axis=0) for N in range(13)]
+observations = [Backend.create_matrix_func(np.max(
+    np.vstack(((1 - np.abs(12 - 4 * np.arange(4) - N) / 4), np.zeros(4))),
+    axis=0), dtype=Backend.float) for N in range(13)]
 rng = np.random.default_rng()
 
-w_optimal = np.arange(start=-24, stop=8, step=8)
+w_optimal = Backend.arange(-24, 8, 8)
 
 
 def play_game(agent, total_timesteps=1000, iterations=100):
@@ -28,7 +34,7 @@ def play_game(agent, total_timesteps=1000, iterations=100):
             observation = observations[pos]
 
             while timestep <= total_timesteps:
-                record.append(np.sqrt(np.mean((agent.w - w_optimal) ** 2)))
+                record.append(Backend.sqrt(Backend.mean((agent.w - w_optimal) ** 2)))
                 pos -= rng.choice([1, 2]) if pos > 1 else 1
                 next_observation = observations[pos]
                 timestep += 1
@@ -42,7 +48,7 @@ def play_game(agent, total_timesteps=1000, iterations=100):
                 observation = next_observation
 
         records.append(record)
-    return np.mean(np.array(records), axis=0)
+    return Backend.mean(Backend.create_matrix_func(records), 0)
 
 
 plt.figure(dpi=120, figsize=(8, 6))
