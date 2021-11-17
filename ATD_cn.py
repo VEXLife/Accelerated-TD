@@ -104,8 +104,8 @@ def register_trace_update_func(
             raise TypeError("错误的更新方式名称。")
 
         def _trace_update_func(self: Any, observation: np.ndarray,
-                               discount: Fraction, e: Optional[np.ndarray],
-                               lambd: Optional[Fraction], rho: Optional[Fraction] = 1.,
+                               discount: Fraction, e: Optional[np.ndarray] = None,
+                               lambd: Optional[Fraction] = None, rho: Optional[Fraction] = 1.,
                                i: Optional[Fraction] = 1.) -> np.ndarray:
             assert observation.shape == (
                 self.observation_space_n,), f"当前局面观测数据的形状不正确。应为({self.observation_space_n},)，而不是{observation.shape}"
