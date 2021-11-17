@@ -20,7 +20,7 @@ if sys.version_info < (3, 8):
     warnings.warn("检测到Python版本过低！", category=ImportWarning)
 
 try:
-    from typing import Any, Iterable, Optional, Tuple, Union, Callable, Dict, Final, final
+    from typing import Any, Iterable, Optional, Tuple, Union, Callable, Final, final
     from abc import abstractmethod
 except ImportError:
     warnings.warn("未能引入类型提示库，可能是Python版本过低。", category=ImportWarning)
@@ -31,7 +31,7 @@ except ImportError:
 
 
     abstractmethod = final = original_decorator
-    Any = Iterable = Optional = Tuple = Union = Callable = Dict = Final = None
+    Any = Iterable = Optional = Tuple = Union = Callable = Final = None
 try:
     import numpy as np
 
@@ -41,7 +41,7 @@ except ImportError:
     raise ImportError("未能引入NumPy，是否未安装？")
     exit(-1)
 
-meta_data: Dict = {"trace_update_mode": {},
+meta_data: dict = {"trace_update_mode": {},
                    "w_update_emphasizes": ["complexity", "accuracy"],
                    "rcond": 1e-9}  # 元数据
 Fraction: Final = Union[float, int]
