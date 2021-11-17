@@ -13,7 +13,7 @@ Notes
 元数据 `rcond` :
     由于计算精度问题，取逆将导致小误差被放大，
     因此需要将所有小于 ``rcond`` 的数设为0以避免此问题。\n
-    默认值为 :math:`1\\times 10^{-7}`
+    默认值为 :math:`1\\times 10^{-5}`
 """
 import sys
 import warnings
