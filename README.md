@@ -50,7 +50,7 @@ To import my implementation of the algorithm into your project, follow these ins
    import sys
 
    sys.path.append("<The directory where you placed ATD_cn.py>")
-   from ATD_cn import TDAgent, SVDATDAgent, DiagonalizedSVDATDAgent, PlainATDAgent  # or any agent you want
+   from atd_cn import TDAgent, SVDATDAgent, DiagonalizedSVDATDAgent, PlainATDAgent  # or any agent you want
    ```
 4. Initialize an agent like this and you are ready to use it!
    ```python
