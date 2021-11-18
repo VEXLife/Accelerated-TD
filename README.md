@@ -3,7 +3,7 @@
 This is my implementation of the Accelerated Gradient Temporal Difference Learning algorithm (ATD) in Python.
 
 `PlainATDAgent` updates ![](https://latex.codecogs.com/svg.image?\mathbf{A}) directly while `SVDATDAgent` and `DiagonalizedSVDATDAgent` update its singular value decompositions respectively which is thought to have a fewer complexity. The difference between `SVDATDAgent` and `DiagonalizedSVDATDAgent` is that `SVDATDAgent` employs the method mentioned here: [Brand 2006](https://pdf.sciencedirectassets.com/271586/1-s2.0-S0024379506X04573/1-s2.0-S0024379505003812/main.pdf), and `DiagonalizedSVDATDAgent` adopted the method mentioned here: [Gahring 2015](https://arxiv.org/pdf/1511.08495) which diagonalizes ![](https://latex.codecogs.com/svg.image?\mathbf{\Sigma}) so that the pseudo-inverse of the matrix is more easy to calculate though I still can't figure out completely how it works.
-I also implemented a conventional Gradient Temporal Difference called `TDAgent`. I tested them in several environments as introduced below.
+I also implemented a conventional Gradient Temporal Difference agent called `TDAgent`. I tested them in several environments as introduced below.
 
 I provided the backend support for PyTorch(CPU) to skip the process converting from `numpy.ndarray` to `torch.Tensor` and vice versa. You can achieve this by adding this code before importing atd module:
 ```python
