@@ -39,9 +39,9 @@ except ImportError:
 
 try:
     if sys.version_info < (3, 10):
+        # 针对旧版本的支持
         from backend_manager_39 import Backend, Matrix, Fraction, isinstance
     else:
-        # 针对旧版本的支持
         from backend_manager_310 import Backend, Matrix, Fraction
 except ImportError:
     raise ImportError("未能引入指定的后端，是否未安装或是不支持的后端？")
