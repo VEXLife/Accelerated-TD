@@ -39,9 +39,9 @@ The code file is [this](https://github.com/VEXLife/Accelerated-TD/blob/main/algo
 
 # Usage
 
-To import my implementation of the algorithm into your project, and you aren't very familiar with this, follow these instructions.
+To import my implementation of the algorithm into your project, follow these instructions if you aren't very familiar with this.
 1. Clone the repository and copy the `ATD_cn.py` to where you want. If you downloaded a .zip file from GitHub, remember to unzip it.
-2. Add these code to your Python script's head:
+2. Add this code to your Python script's head:
    ```python
    from atd_cn import TDAgent, SVDATDAgent, DiagonalizedSVDATDAgent, PlainATDAgent  # or any agent you want
    ```
