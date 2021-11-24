@@ -3,7 +3,7 @@
 This is my implementation of the Accelerated Gradient Temporal Difference Learning algorithm (ATD) in Python.
 
 `PlainATDAgent` updates ![](https://latex.codecogs.com/svg.image?\mathbf{A}) directly while `SVDATDAgent` and `DiagonalizedSVDATDAgent` update its singular value decompositions respectively which is thought to have a fewer complexity. The difference between `SVDATDAgent` and `DiagonalizedSVDATDAgent` is that `SVDATDAgent` employs the method mentioned here: [Brand 2006](https://pdf.sciencedirectassets.com/271586/1-s2.0-S0024379506X04573/1-s2.0-S0024379505003812/main.pdf), and `DiagonalizedSVDATDAgent` adopted the method mentioned here: [Gahring 2015](https://arxiv.org/pdf/1511.08495) which diagonalizes ![](https://latex.codecogs.com/svg.image?\mathbf{\Sigma}) so that the pseudo-inverse of the matrix is more easy to calculate though I still can't figure out completely how it works.
-I also implemented a conventional Gradient Temporal Difference called `TDAgent`. I tested them in several environments as introduced below.
+I also implemented a conventional Gradient Temporal Difference agent called `TDAgent`. I tested them in several environments as introduced below.
 
 I provided the backend support for PyTorch(CPU) to skip the process converting from `numpy.ndarray` to `torch.Tensor` and vice versa. You can achieve this by adding this code before importing atd module:
 ```python
@@ -39,9 +39,9 @@ The code file is [this](https://github.com/VEXLife/Accelerated-TD/blob/main/algo
 
 # Usage
 
-To import my implementation of the algorithm into your project, and you aren't very familiar with this, follow these instructions.
+To import my implementation of the algorithm into your project, follow these instructions if you aren't very familiar with this.
 1. Clone the repository and copy the `ATD_cn.py` to where you want. If you downloaded a .zip file from GitHub, remember to unzip it.
-2. Add these code to your Python script's head:
+2. Add this code to your Python script's head:
    ```python
    from atd_cn import TDAgent, SVDATDAgent, DiagonalizedSVDATDAgent, PlainATDAgent  # or any agent you want
    ```
@@ -50,7 +50,7 @@ To import my implementation of the algorithm into your project, and you aren't v
    import sys
 
    sys.path.append("<The directory where you placed ATD_cn.py>")
-   from ATD_cn import TDAgent, SVDATDAgent, DiagonalizedSVDATDAgent, PlainATDAgent  # or any agent you want
+   from atd_cn import TDAgent, SVDATDAgent, DiagonalizedSVDATDAgent, PlainATDAgent  # or any agent you want
    ```
 4. Initialize an agent like this and you are ready to use it!
    ```python
