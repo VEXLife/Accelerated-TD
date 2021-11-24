@@ -1,6 +1,6 @@
 #!python
 # -*- coding: utf-8 -*-
-# @Author：BWLL
+# @Author：Midden Vexu
 # The Random Walking Environment to test the algorithm
 
 import sys

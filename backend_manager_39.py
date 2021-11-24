@@ -1,6 +1,6 @@
 #!python
 # -*- coding: utf-8 -*-
-# @Author：BWLL
+# @Author：Midden Vexu
 # A helper script for backend switching.
 
 import os
@@ -31,6 +31,23 @@ if os.environ["ATD_BACKEND"] == "NumPy":
         Backend.create_matrix_func = Backend.array
         Backend.convert_to_matrix_func = Backend.asarray
 
+
+        def extend_with_000(mat: Matrix) -> Matrix:
+            """
+            用于在二维张量mat周围补0
+            """
+            return Backend.pad(mat, ((0, 1), (0, 1)))
+
+
+        def extend_with_010(mat: Matrix) -> Matrix:
+            """
+            在补0的基础上将右下角设为1
+            """
+            mat_ = extend_with_000(mat)
+            mat_[-1, -1] = 1
+            return mat_
+
+
         if Backend.__version__ < "1.19.0":
             warnings.warn(f"NumPy {Backend.__version__} might not work. You'd better upgrade to a newer version.",
                           category=ImportWarning)
@@ -48,7 +65,23 @@ elif os.environ["ATD_BACKEND"] == "PyTorch":
         Fraction: Union = Union[int, float, Backend.FloatType, Backend.IntType]
         Backend.create_matrix_func = Backend.tensor
         Backend.convert_to_matrix_func = Backend.as_tensor
-        Backend.pad = lambda mat, padding: F.pad(mat, pad=tuple(chain.from_iterable(padding)), mode="constant", value=0)
+
+
+        def extend_with_000(mat: Matrix) -> Matrix:
+            """
+            用于在二维张量mat周围补0
+            """
+            return F.pad(mat, pad=(0, 1, 0, 1), mode="constant", value=0)
+
+
+        def extend_with_010(mat: Matrix) -> Matrix:
+            """
+            在补0的基础上将右下角设为1
+            """
+            mat_ = extend_with_000(mat)
+            mat_[-1, -1] = 1
+            return mat_
+
 
         if Backend.__version__ < "1.10":
             warnings.warn(f"PyTorch {Backend.__version__} might not work. You'd better upgrade to a newer version.",

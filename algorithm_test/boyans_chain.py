@@ -1,6 +1,6 @@
 #!python
 # -*- coding: utf-8 -*-
-# @Author：BWLL
+# @Author：Midden Vexu
 # The Boyan's Chain Environment to test the algorithm
 
 import sys

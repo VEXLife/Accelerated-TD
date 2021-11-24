@@ -1,6 +1,6 @@
 #!python
 # -*- coding: utf-8 -*-
-# @Author：BWLL
+# @Author：Midden Vexu
 
 """
 atd_cn
@@ -39,10 +39,10 @@ except ImportError:
 
 try:
     if sys.version_info < (3, 10):
-        from backend_manager_39 import Backend, Matrix, Fraction, isinstance
+        from backend_manager_39 import Backend, Matrix, Fraction, isinstance, extend_with_000, extend_with_010
     else:
         # 针对旧版本的支持
-        from backend_manager_310 import Backend, Matrix, Fraction
+        from backend_manager_310 import Backend, Matrix, Fraction, extend_with_000, extend_with_010
 except ImportError:
     raise ImportError("未能引入指定的后端，是否未安装或是不支持的后端？")
     exit(-1)
@@ -461,20 +461,6 @@ class SVDATDAgent(AbstractAgent):
         self.U, self.V, self.Sigma = Backend.empty(
             (self.observation_space_n, 0)), Backend.empty((self.observation_space_n, 0)), Backend.empty((0, 0))
 
-    def extendWith000(self, mat: Matrix) -> Matrix:
-        """
-        用于在二维张量mat周围补0
-        """
-        return Backend.pad(mat, ((0, 1), (0, 1)))
-
-    def extendWith010(self, mat: Matrix) -> Matrix:
-        """
-        在补0的基础上将右下角设为1
-        """
-        mat_ = self.extendWith000(mat)
-        mat_[-1, -1] = 1
-        return mat_
-
     def svd_update(
             self,
             U: Matrix,
@@ -539,8 +525,8 @@ class SVDATDAgent(AbstractAgent):
         p_l2 = Backend.linalg.norm(p)
         q_l2 = Backend.linalg.norm(q)
 
-        K = self.extendWith000(Sigma) + Backend.vstack((m, p_l2)
-                                                       ) @ Backend.vstack((n, q_l2)).T
+        K = extend_with_000(Sigma) + Backend.vstack((m, p_l2)
+                                                         ) @ Backend.vstack((n, q_l2)).T
 
         p = p / p_l2 if p_l2 > 0 else Backend.zeros_like(p)
         q = q / q_l2 if q_l2 > 0 else Backend.zeros_like(q)
@@ -646,8 +632,8 @@ class DiagonalizedSVDATDAgent(SVDATDAgent):
         p_l2 = Backend.linalg.norm(p)
         q_l2 = Backend.linalg.norm(q)
 
-        K = self.extendWith000(Sigma) + Backend.vstack((m, p_l2)
-                                                       ) @ Backend.vstack((n, q_l2)).T
+        K = extend_with_000(Sigma) + Backend.vstack((m, p_l2)
+                                                         ) @ Backend.vstack((n, q_l2)).T
 
         if self.svd_diagonalizing:
             L_, Sigma, R_ = Backend.linalg.svd(K)
@@ -656,8 +642,8 @@ class DiagonalizedSVDATDAgent(SVDATDAgent):
         else:
             L_, Sigma, R_ = self.diagonalize(K)
 
-        self.L = self.extendWith010(self.L) @ L_
-        self.R = self.extendWith010(self.R) @ R_
+        self.L = extend_with_010(self.L) @ L_
+        self.R = extend_with_010(self.R) @ R_
         p = p / p_l2 if p_l2 > meta_data["rcond"] else Backend.zeros_like(p)  # 向量很小时取零向量，因为零向量不会影响伪逆。
         q = q / q_l2 if q_l2 > meta_data["rcond"] else Backend.zeros_like(q)
         U = Backend.hstack((U, p))
