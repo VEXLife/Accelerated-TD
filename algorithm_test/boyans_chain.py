@@ -14,10 +14,19 @@ import matplotlib.pyplot as plt
 
 observations = [Backend.create_matrix_func(np.max(
     np.vstack(((1 - np.abs(12 - 4 * np.arange(4) - N) / 4), np.zeros(4))),
-    axis=0), dtype=Backend.float) for N in range(13)]
+    axis=0), dtype=Backend.float32) for N in range(13)]
 rng = np.random.default_rng()
 
-w_optimal = Backend.arange(-24, 8, 8)
+w_optimal = Backend.arange(-24, 8, 8, dtype=Backend.float32)
+
+
+def evaluate(w, w_pi):
+    observation_count = 0
+    absolute_error = 0
+    for observation in observations[1:]:  # Skip the first terminal state.
+        absolute_error += abs((w @ observation - w_pi @ observation) / (w_pi @ observation))
+        observation_count += 1
+    return absolute_error / observation_count
 
 
 def play_game(agent, total_timesteps=1000, iterations=100):
@@ -34,7 +43,7 @@ def play_game(agent, total_timesteps=1000, iterations=100):
             observation = observations[pos]
 
             while timestep <= total_timesteps:
-                record.append(Backend.sqrt(Backend.mean((agent.w - w_optimal) ** 2)))
+                record.append(evaluate(agent.w, w_optimal))
                 pos -= rng.choice([1, 2]) if pos > 1 else 1
                 next_observation = observations[pos]
                 timestep += 1
@@ -54,30 +63,30 @@ def play_game(agent, total_timesteps=1000, iterations=100):
 plt.figure(dpi=120, figsize=(8, 6))
 
 plt.plot(play_game(agent=TDAgent(lr=0.1, lambd=0, observation_space_n=4, action_space_n=2),
-                   iterations=1), label="TD(0), $\\alpha=0.1$")
+                   iterations=10), label="TD(0), $\\alpha=0.1$")
 plt.plot(play_game(agent=DiagonalizedSVDATDAgent(k=30, eta=1e-4, lambd=0, observation_space_n=4,
                                                  action_space_n=2),
-                   iterations=1),
+                   iterations=10),
          label="DiagonalizedSVDATD(0), $\\alpha=\\frac{1}{1+t}$, \n$\\eta=1\\times10^{-4}$, $r=30$, Accuracy First")
 plt.plot(play_game(agent=DiagonalizedSVDATDAgent(k=30, eta=1e-4, lambd=0, observation_space_n=4,
                                                  action_space_n=2, svd_diagonalizing=False,
                                                  w_update_emphasizes="complexity"),
-                   iterations=1),
+                   iterations=10),
          label="DiagonalizedSVDATD(0), $\\alpha=\\frac{1}{1+t}$, \n$\\eta=1\\times10^{-4}$, $r=30$, Complexity First")
 plt.plot(play_game(agent=DiagonalizedSVDATDAgent(k=30, eta=1e-4, lambd=0, observation_space_n=4,
                                                  action_space_n=2, svd_diagonalizing=True,
                                                  w_update_emphasizes="complexity"),
-                   iterations=1),
+                   iterations=10),
          label="DiagonalizedSVDATD(0), $\\alpha=\\frac{1}{1+t}$, \n$\\eta=1\\times10^{-4}$, $r=30$, Complexity First\
           \nUsing SVD to diagonalize")
 plt.plot(play_game(agent=SVDATDAgent(eta=1e-4, lambd=0, observation_space_n=4, action_space_n=2),
-                   iterations=1), label="SVDATD(0), $\\alpha=\\frac{1}{1+t}$, $\\eta=1\\times10^{-4}$")
+                   iterations=10), label="SVDATD(0), $\\alpha=\\frac{1}{1+t}$, $\\eta=1\\times10^{-4}$")
 plt.plot(play_game(agent=PlainATDAgent(eta=1e-4, lambd=0, observation_space_n=4, action_space_n=2),
-                   iterations=1), label="PlainATD(0), $\\alpha=\\frac{1}{1+t}$, $\\eta=1\\times10^{-4}$")
+                   iterations=10), label="PlainATD(0), $\\alpha=\\frac{1}{1+t}$, $\\eta=1\\times10^{-4}$")
 plt.legend()
 plt.title("Boyan's Chain")
 plt.xlabel("Timesteps")
-plt.ylabel("RMSE")
-plt.ylim(0, 14.5)
+plt.ylabel("Percentage Error")
+plt.ylim(0, 1)
 plt.xlim(0, 1000)
 plt.savefig("./figures/boyans_chain.png", format="png")
