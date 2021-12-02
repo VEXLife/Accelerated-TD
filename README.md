@@ -28,19 +28,19 @@ To test it yourself, just clone the repository and run `python algorithm_test/<r
 This environment is from [Sutton's book](http://incompleteideas.net/book/RLbook2020.pdf).
 
 The code file is [this](https://github.com/VEXLife/Accelerated-TD/blob/main/algorithm_test/random_walk.py) and the result is [here](https://github.com/VEXLife/Accelerated-TD/blob/main/figures/random_walk.png):
-![random_walk](https://user-images.githubusercontent.com/36587232/142213323-8cbd7af5-d6f1-43e2-b19c-7a239af6d5d6.png)
+![random_walk](https://user-images.githubusercontent.com/36587232/144394107-d0cf9bd0-ea09-4e48-ba04-cb07af9e4240.png)
 
 ## Boyan's Chain
 
-The environment was proposed by Boyan, but I don't have a direct link to his article.
+The environment was proposed in [Boyan 1999](https://www.researchgate.net/publication/2621189_Least-Squares_Temporal_Difference_Learning).
 
 The code file is [this](https://github.com/VEXLife/Accelerated-TD/blob/main/algorithm_test/boyans_chain.py) and the result is [here](https://github.com/VEXLife/Accelerated-TD/blob/main/figures/boyans_chain.png):
-![boyans_chain](https://user-images.githubusercontent.com/36587232/142213312-bf524974-1bc2-4388-b972-0b076a8084c2.png)
+![boyans_chain](https://user-images.githubusercontent.com/36587232/144394100-dc8c48c2-1d38-433f-aea6-f202da3bbb13.png)
 
 # Usage
 
 To import my implementation of the algorithm into your project, follow these instructions if you aren't very familiar with this.
-1. Clone the repository and copy the `ATD_cn.py` to where you want. If you downloaded a .zip file from GitHub, remember to unzip it.
+1. Clone the repository and copy the `atd_cn.py` to where you want. If you downloaded a .zip file from GitHub, remember to unzip it.
 2. Add this code to your Python script's head:
    ```python
    from atd_cn import TDAgent, SVDATDAgent, DiagonalizedSVDATDAgent, PlainATDAgent  # or any agent you want
@@ -49,12 +49,12 @@ To import my implementation of the algorithm into your project, follow these ins
    ```python
    import sys
 
-   sys.path.append("<The directory where you placed ATD_cn.py>")
+   sys.path.append("<The directory where you placed atd_cn.py>")
    from atd_cn import TDAgent, SVDATDAgent, DiagonalizedSVDATDAgent, PlainATDAgent  # or any agent you want
    ```
 4. Initialize an agent like this and you are ready to use it!
    ```python
-   agent=TDAgent(lr=0.01, lambd=0, observation_space_n=4, action_space_n=2)
+   agent = TDAgent(lr=0.01, lambd=0, observation_space_n=4, action_space_n=2)
    ```
 
 Reference: [Gahring 2016](https://arxiv.org/pdf/1611.09328.pdf)

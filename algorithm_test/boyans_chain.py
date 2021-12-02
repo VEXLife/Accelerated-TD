@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Author：Midden Vexu
 # The Boyan's Chain Environment to test the algorithm
+# Reference: https://www.researchgate.net/publication/2621189_Least-Squares_Temporal_Difference_Learning
 
 import sys
 

@@ -1,6 +1,8 @@
 #!python
 # -*- coding: utf-8 -*-
 # @Author：Midden Vexu
+# Original repository is https://github.com/VEXLife/Accelerated-TD
+# Reference: https://arxiv.org/pdf/1611.09328.pdf
 
 """
 atd_cn

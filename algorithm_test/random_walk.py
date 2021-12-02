@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Author：Midden Vexu
 # The Random Walking Environment to test the algorithm
+# Reference: http://incompleteideas.net/book/RLbook2020.pdf
 
 import sys
 
