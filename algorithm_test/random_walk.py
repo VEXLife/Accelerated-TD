@@ -14,7 +14,7 @@ from tqdm import trange
 import matplotlib.pyplot as plt
 
 N = 7
-v_true = Backend.arange(N)[1:N] / (N - 1)
+v_true = Backend.linspace(1, N, N - 1) / (N - 1)
 v = None
 rng = np.random.default_rng()
 
