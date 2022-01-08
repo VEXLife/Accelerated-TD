@@ -1,5 +1,20 @@
 #!python
 # -*- coding: utf-8 -*-
+#
+# Copyright 2022 Midden Vexu
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
 # @Author：Midden Vexu
 # The Boyan's Chain Environment to test the algorithm
 # Reference: https://www.researchgate.net/publication/2621189_Least-Squares_Temporal_Difference_Learning
@@ -8,7 +23,7 @@ import sys
 
 sys.path.append(".")
 
-from atd_cn import TDAgent, SVDATDAgent, DiagonalizedSVDATDAgent, PlainATDAgent, Backend
+from atd import TDAgent, SVDATDAgent, DiagonalizedSVDATDAgent, PlainATDAgent, Backend
 import numpy as np
 from tqdm import trange
 import matplotlib.pyplot as plt

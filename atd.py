@@ -14,37 +14,41 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
+# 
 # @Author：Midden Vexu
-# 原始仓库：https://github.com/VEXLife/Accelerated-TD
-# 参考文献：https://arxiv.org/pdf/1611.09328.pdf
+# Original repository is https://github.com/VEXLife/Accelerated-TD
+# Reference: https://arxiv.org/pdf/1611.09328.pdf
 
 """
-atd_cn
+atd
 ======
 
-带有中文注释的算法的主体实现。现在，您可以通过设置环境变量“ATD_BACKEND”来选择要使用的后端。已支持NumPy、PyTorch(CPU)。
+Now you're able to switch between backends including NumPy and PyTorch(CPU) via
+setting environment variable "ATD_BACKEND".\n
+For more details, see `README.MD`.
 
 Notes
 ------
-元数据 `rcond` :
-    由于计算精度问题，取逆将导致小误差被放大，
-    因此需要将所有小于 ``rcond`` 的数设为0以避免此问题。\n
-    默认值为 :math:`1\\times 10^{-5}`
+Meta data `rcond` :
+    The universal ``rcond`` parameter for all ``numpy.pinv``.\n
+    For more details, see https://numpy.org/doc/stable/reference/generated/numpy.linalg.pinv.html#numpy.linalg.pinv.\n
+    Frankly speaking, this parameter stands for a cutoff for small singular values.
+    Default is :math:`1\\times 10^{-5}`
 """
 import sys
 import warnings
 from math import sqrt
 
 if sys.version_info < (3, 9):
-    warnings.warn("检测到Python版本过低！部分功能可能无法正常运作。", category=ImportWarning)
+    warnings.warn("You're suggested to upgrade your Python interpreter.", category=ImportWarning)
 
 try:
     from typing import Any, Iterable, Optional, Tuple, Union, Callable, Final, final
     from abc import abstractmethod
     from functools import wraps
 except ImportError:
-    warnings.warn("未能引入类型提示库，可能是Python版本过低。", category=ImportWarning)
+    warnings.warn("Unable to import type hinting library, "
+                  "possibly because you have to upgrade your Python interpreter.", category=ImportWarning)
 
 
     def original_decorator(obj: Callable) -> Callable:
@@ -56,17 +60,17 @@ except ImportError:
 
 try:
     if sys.version_info < (3, 10):
-        # 针对旧版本的支持
+        # Support for old version
         from backend_manager_39 import Backend, Matrix, Fraction, isinstance, extend_with_000, extend_with_010
     else:
         from backend_manager_310 import Backend, Matrix, Fraction, extend_with_000, extend_with_010
 except ImportError:
-    raise ImportError("未能引入指定的后端，是否未安装或是不支持的后端？")
+    raise ImportError("Unable to import the specified backend!")
     exit(-1)
 
 meta_data: dict = {"trace_update_mode": {},
                    "w_update_emphasizes": ["complexity", "accuracy"],
-                   "rcond": 1e-5}  # 元数据
+                   "rcond": 1e-5}  # Meta data
 TraceUpdateFunction: Final = Callable[[Any, Matrix, Fraction, Optional[Matrix],
                                        Optional[Fraction], Optional[Fraction],
                                        Optional[Fraction]], Matrix]
@@ -76,10 +80,10 @@ def learn_func_wrapper(
         func: Callable[[Any, Matrix, Matrix, float, float, int], Any]
 ) -> Callable[[Any, Matrix, Matrix, float, float, int], Any]:
     """
-    学习函数的装饰器，用于辅助检查输入数据。
+    The decorator for the learn function. Helpful for checking input.
     """
     if not callable(func):
-        raise ValueError("错误的装饰器用法或输入不是可调用的函数。")
+        raise ValueError("Unexpected decorator usage.")
 
     @wraps(func)
     def _learn_func(
@@ -91,16 +95,16 @@ def learn_func_wrapper(
             t: int
     ) -> Any:
         assert observation.shape == (
-            self.observation_space_n,), f"当前局面观测数据的形状不正确。应为({self.observation_space_n},)，而不是{observation.shape}"
+            self.observation_space_n,), f"Bad observation shape. Expected ({self.observation_space_n},), not {observation.shape}"
         assert next_observation.shape == (
-            self.observation_space_n,), f"下一个局面观测数据的形状不正确。应为({self.observation_space_n},)，而不是{next_observation.shape}"
+            self.observation_space_n,), f"Bad next observation shape. Expected ({self.observation_space_n},), not {next_observation.shape}"
         if not (isinstance(reward, Fraction) and isinstance(discount, Fraction)
                 and isinstance(t, int) and isinstance(self, AbstractAgent)):
-            raise TypeError("参数类型不正确！")
+            raise TypeError("Invalid input type!")
         if not (t >= 0 and 0 <= discount <= 1):
-            raise ValueError("无效的参数！")
+            raise ValueError("Invalid hyperparameter!")
 
-        self.lr = self.lr_func(t)  # 计算新的学习率
+        self.lr = self.lr_func(t)  # Calculate the new learning rate
 
         return func(self, observation, next_observation, reward, discount, t)
 
@@ -111,20 +115,20 @@ def register_trace_update_func(
         mode_name: str
 ) -> Callable[[TraceUpdateFunction], TraceUpdateFunction]:
     """
-    注册资格迹更新函数的装饰器。
+    Decorator for registering trace update functions.
     """
 
     def _trace_update_func_wrapper(
             func: TraceUpdateFunction
     ) -> TraceUpdateFunction:
         """
-        资格迹更新函数的装饰器，用于辅助检查输入数据。
+        Decorator for trace update functions. Helpful for checking input.
         """
 
         if not callable(func):
-            raise ValueError("错误的装饰器用法或输入不是可调用的函数。")
+            raise ValueError("Unexpected decorator usage.")
         if not isinstance(mode_name, str):
-            raise TypeError("错误的更新方式名称。")
+            raise TypeError("Invalid trace update mode type.")
 
         @wraps(func)
         def _trace_update_func(self: Any, observation: Matrix,
@@ -132,12 +136,12 @@ def register_trace_update_func(
                                lambd: Optional[Fraction] = None, rho: Optional[Fraction] = 1.,
                                i: Optional[Fraction] = 1.) -> Matrix:
             assert observation.shape == (
-                self.observation_space_n,), f"当前局面观测数据的形状不正确。应为({self.observation_space_n},)，而不是{observation.shape}"
+                self.observation_space_n,), f"Bad observation shape. Expected ({self.observation_space_n},), not {observation.shape}"
             if not (isinstance(discount, Fraction) and isinstance(lambd, Fraction)
                     and isinstance(self, AbstractAgent)):
-                raise TypeError("参数类型不正确！")
+                raise TypeError("Invalid input type!")
             if not 0 <= discount <= 1:
-                raise ValueError("无效的γ折扣！")
+                raise ValueError("Invalid discount parameter!")
             if e is None:
                 e = self.e
             if lambd is None:
@@ -156,27 +160,28 @@ class AbstractAgent:
     AbstractAgent
     ======
 
-    抽象的智能体类，提供基本的一些功能。
+    The abstract agent class, offering some fundamental functions.
 
     Parameters
     ------
     observation_space_n :
-        观测空间大小
+        The shape(1-D) of observation space
     action_space_n :
-        动作空间大小
+        The shape(1-D) of action space
     lr :
-        学习率，可以是一个接受时间步作为参数，输出相应学习率的函数，或是一个浮点小数表示常数学习率
+        learning rate, could be a function with time step as input and learning rate as output, or a float representing
+        constant learning rate
     lambd :
-        资格迹所需的λ值
+        λ for trace updating
     trace_update_mode :
-        资格迹更新方式，取值 ``conventional | emphatic`` 。默认为传统方式( ``conventional`` )
+        Trace update mode, should be in ``conventional | emphatic`` . Default is ``conventional``.
 
     Raises
     ------
     TypeError
-        参数类型不正确
+        Invalid input type
     AssertionError
-        无法处理的学习率参数
+        Unable to deal with the learning rate input
     """
 
     def __init__(self, observation_space_n: int, action_space_n: int,
@@ -187,15 +192,15 @@ class AbstractAgent:
                 and isinstance(lambd, Fraction)
                 and isinstance(meta_data["rcond"], Fraction)
                 and isinstance(trace_update_mode, str)):
-            raise TypeError("参数类型不正确！")
+            raise TypeError("Invalid input type!")
         if trace_update_mode not in meta_data["trace_update_mode"].keys():
             warnings.warn(
-                f"不支持的资格迹更新方式{trace_update_mode}！将改为conventional。")
+                f"Not supported trace update mode: {trace_update_mode}! Will be set to conventional。")
             trace_update_mode = "conventional"
         if isinstance(lr, Fraction):
             self.lr_func = lambda t: lr
         else:
-            assert callable(lr), "无法处理的学习率参数！"
+            assert callable(lr), "Unable to deal with the learning rate input."
             self.lr_func = lr
 
         self.observation_space_n = observation_space_n
@@ -208,13 +213,13 @@ class AbstractAgent:
 
     def reinit(self) -> None:
         """
-        让智能体忘记学到的东西。
+        Make the agent forget what it learned.
         """
-        self.w = Backend.empty(self.observation_space_n)  # 任意地初始化权重
+        self.w = Backend.empty(self.observation_space_n)  # Initialize the weight arbitrarily
 
     def reset(self) -> None:
         """
-        重置与一局游戏有关的智能体参数。应在一局新游戏开始时调用。
+        Reset everything of the agent. Should be invoked when a game begins.
         """
         self.F = 0
         self.M = 0
@@ -230,66 +235,66 @@ class AbstractAgent:
             t: int
     ) -> Any:
         """
-        训练智能体。这个函数应当装配 ``@learn_func_wrapper`` 装饰器检查输入。
+        Train the agent. Should be decorated with ``@learn_func_wrapper`` .
 
         Parameters
         ------
         observation :
-            当前局面
+            Current observation
         next_observation :
-            下一个局面
+            Next observation
         reward :
-            局面奖赏
+            Reward
         discount :
-            γ折扣，例如除了游戏结束时取0以外全取0.99
+            γ discount. 0 for the terminal step and 0.99 for the rest for example
         t :
-            游戏已进行的步数，从0开始
+            Time step. Starts from 0
 
         Returns
         ------
         Any :
-            误差
+            The loss
 
         Raises
         ------
         NotImplementedError
-            相应的学习算法未被实现
+            This learn function has not been implemented yet
         AssertionError
-            输入的形状不正确
+            Invalid input shape
         TypeError
-            参数类型不正确
+            Invalid input type
         ValueError
-            参数无效
+            Invalid hyperparameter
         """
-        raise NotImplementedError("智能体不可训练。")
+        raise NotImplementedError("The agent is not trainable!")
 
     def decide(self, next_observations: Iterable[Matrix]) -> int:
         """
-        让智能体决策一步。
+        Ask the agent to pick an action.
 
         Parameters
         ------
         next_observations :
-            各个动作执行后下一个局面构成的列表
+            A list consisted of all the next observations
 
         Returns
         ------
         action : int
-            智能体决定执行的动作序号
+            The action index picked by the agent
 
         Raises
         ------
         ValueError
-            意外的错误
+            Unexpected error
         """
         warnings.simplefilter("default", DeprecationWarning)
-        warnings.warn("未经测试的功能！", category=DeprecationWarning)
+        warnings.warn("This function has not been tested yet!", category=DeprecationWarning)
 
         try:
             next_v = [self.w @ next_observation
                       for next_observation in next_observations]
         except ValueError:
-            print("发生错误，或许是输入的数据不正确？")
+            print("Unexcepted error, maybe the input shape is invalid?")
             return -1
 
         return Backend.argmax(next_v)
@@ -300,7 +305,7 @@ class AbstractAgent:
                      lambd: Optional[Fraction] = None, rho: Optional[Fraction] = 1.,
                      i: Optional[Fraction] = 1.) -> Matrix:
         """
-        资格迹更新（累积迹）。
+        Trace update function (accumulative).\n
         若欲加入自己的资格迹更新算法，请不要直接重写此函数，而是定义新的函数，
         并添加 ``@staticmethod`` 和 ``@register_trace_update_func("<资格迹算法名称>")`` 装饰器。
 
@@ -329,9 +334,9 @@ class AbstractAgent:
         Raises
         ------
         AssertionError
-            输入的形状不正确
+            Invalid input shape
         TypeError
-            参数类型不正确
+            Invalid input type
         ValueError
             γ折扣无效
         """
@@ -355,7 +360,7 @@ class AbstractAgent:
         内部函数。用于实现具体的强调资格迹更新算法。
         """
         if not (isinstance(rho, Fraction) and isinstance(i, Fraction)):
-            raise TypeError("参数类型不正确！")
+            raise TypeError("Invalid input type!")
 
         self.F = rho * discount * self.F + i
         self.M = lambd * i + (1 - lambd) * self.F
@@ -412,7 +417,7 @@ class PlainATDAgent(AbstractAgent):
                  **kwargs) -> None:
         super().__init__(lr=lr, **kwargs)
         if not (isinstance(eta, Fraction)):
-            raise TypeError("参数类型不正确！")
+            raise TypeError("Invalid input type!")
 
         self.eta = eta
 
@@ -469,7 +474,7 @@ class SVDATDAgent(AbstractAgent):
                  **kwargs) -> None:
         super().__init__(lr=lr, **kwargs)
         if not (isinstance(eta, Fraction)):
-            raise TypeError("参数类型不正确！")
+            raise TypeError("Invalid input type!")
 
         self.eta = eta
 
@@ -605,7 +610,7 @@ class DiagonalizedSVDATDAgent(SVDATDAgent):
                  w_update_emphasizes: Optional[str] = "accuracy", **kwargs) -> None:
         super().__init__(**kwargs)
         if not (isinstance(k, int) and isinstance(svd_diagonalizing, bool)):
-            raise TypeError("参数类型不正确！")
+            raise TypeError("Invalid input type!")
 
         self.k = k
         self.svd_diagonalizing = svd_diagonalizing
@@ -786,7 +791,7 @@ def _svd_minibatch_update(
         D: Matrix, r: int
 ) -> Tuple[Matrix, Matrix, Matrix]:
     """
-    批量奇异值更新，以备不时之需。
+    A backup function.
     """
 
     Q_Z, R_Z = Backend.linalg.qr((1 - U @ U.transpose()) @ Z)
@@ -807,13 +812,13 @@ def _svd_minibatch_update(
 
 print(
     """
-    ATD算法已成功载入。
+    ATD algorithm module has been ready.
     """.strip()
 )
 
 if __name__ == "__main__":
     print(
         """
-        这是ATD算法的实现类，无法直接运行。请另行编写程序调用。
+        This is an implementation of ATD, please invoke it instead of running it directly.
         """.strip()
     )
