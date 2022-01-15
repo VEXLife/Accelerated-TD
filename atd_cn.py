@@ -503,8 +503,6 @@ class SVDATDAgent(AbstractAgent):
             向量z
         d :
             向量d
-        epsilon :
-            一个很小的数，用于防止除以零
 
         Returns
         ------

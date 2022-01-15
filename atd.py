@@ -306,30 +306,35 @@ class AbstractAgent:
                      i: Optional[Fraction] = 1.) -> Matrix:
         """
         Trace update function (accumulative).\n
-        若欲加入自己的资格迹更新算法，请不要直接重写此函数，而是定义新的函数，
-        并添加 ``@staticmethod`` 和 ``@register_trace_update_func("<资格迹算法名称>")`` 装饰器。
+        If you're about to include your own trace update function, please do not override this function, but define
+        a new function instead, with ``@staticmethod`` and
+        ``@register_trace_update_func("<Your trace update function name>")`` decorators.
 
         Parameters
         ------
         self :
-            被操作的智能体对象
+            The agent object for trace update
         observation :
-            当前局面
+            Current observation
         discount :
-            γ折扣，例如除了游戏结束时取0以外全取0.99
+            γ discount. 0 for the terminal step and 0.99 for the rest for example
         e :
-            上一个资格迹。省略即是智能体内存储的结果
+            Previous trace. Omit it to use the one stored in the agent
         lambd :
-            资格迹所需的λ值。省略即是智能体内存储的结果
+            λ for trace updating. Omit it to use the one stored in the agent
         rho :
-            仅在使用强调资格迹更新时需要。异策略时，目标策略π与行动策略b选取对应动作概率之比，同策略时为1
+            Only needed when emphatic trace update is required.
+            In the off-policy context, it is the quotient of the probability to choose the action if applied the target
+            policy π and the probability if applied the behaviour policy b, namely :math:`\\frac{π(a)}{b(a)}` .
+            In the on-policy context, it should be 1.
         i :
-            仅在使用强调资格迹更新时需要。对当前局面的感兴趣程度，均匀感兴趣时可全部取1
+            Only needed when emphatic trace update is required.
+            How much is the agent interested in the current observation. If averagely interested, then it is 1.
 
         Returns
         ------
         Matrix
-            新的资格迹
+            New trace
 
         Raises
         ------
@@ -338,7 +343,7 @@ class AbstractAgent:
         TypeError
             Invalid input type
         ValueError
-            γ折扣无效
+            Invalid γ discount
         """
         ...
 
@@ -347,7 +352,8 @@ class AbstractAgent:
     def __trace_update(*, self, observation: Matrix, discount: Fraction, e: Optional[Matrix] = None,
                        lambd: Optional[Fraction] = None, **kwargs) -> Matrix:
         """
-        内部函数。用于实现具体的经典资格迹更新算法。
+        Internal function.
+        The implementation of concrete conventional trace update algorithm.
         """
         return discount * lambd * e + observation
 
@@ -357,7 +363,8 @@ class AbstractAgent:
                                 lambd: Optional[Fraction] = None, rho: Optional[Fraction] = 1.,
                                 i: Optional[Fraction] = 1., **kwargs) -> Matrix:
         """
-        内部函数。用于实现具体的强调资格迹更新算法。
+        Internal function.
+        The implementation of concrete emphatic trace update algorithm.
         """
         if not (isinstance(rho, Fraction) and isinstance(i, Fraction)):
             raise TypeError("Invalid input type!")
@@ -373,7 +380,7 @@ class TDAgent(AbstractAgent):
     TDAgent
     ======
 
-    经典时序差分算法。
+    Conventional temporal difference learning algorithm.
 
     See Also
     ------
@@ -389,9 +396,9 @@ class TDAgent(AbstractAgent):
             discount: Fraction,
             t: int
     ) -> Any:
-        self.e = self.trace_update(self, observation, discount, self.e, self.lambd)  # 更新资格迹
-        delta = reward + discount * self.w @ next_observation - self.w @ observation  # 计算时序差分误差
-        self.w += self.lr * delta * self.e  # 更新权重
+        self.e = self.trace_update(self, observation, discount, self.e, self.lambd)  # Updates the trace
+        delta = reward + discount * self.w @ next_observation - self.w @ observation  # Calculate the TD error
+        self.w += self.lr * delta * self.e  # Updates the weight
 
         return delta
 
@@ -401,14 +408,14 @@ class PlainATDAgent(AbstractAgent):
     PlainATDAgent
     ======
 
-    直白的加速的时序差分算法(ATD)。
+    Plain accelerated temporal difference learning algorithm(ATD).
 
     Parameters
     ------
     eta :
-        半梯度时序差分(TD)学习率
+        Learning rate for semi-gradient TD.
     lr :
-        半梯度均方投影贝尔曼误差(MSPBE)学习率
+        Learning rate for semi-gradient mean squared projected Bellman error(MSPBE).
     """
 
     def __init__(self,
@@ -434,17 +441,17 @@ class PlainATDAgent(AbstractAgent):
             discount: Fraction,
             t: int
     ) -> Any:
-        beta = 1 / (t + 1)  # 因为这个量要频繁地用到，所以定义成β
-        delta = reward + discount * self.w @ next_observation - self.w @ observation  # 计算时序差分误差
-        self.e = self.trace_update(self, observation, discount, self.e, self.lambd)  # 更新资格迹
+        beta = 1 / (t + 1)  # As this value is frequently used, assign it to a variable β
+        delta = reward + discount * self.w @ next_observation - self.w @ observation  # Calculates the TD error
+        self.e = self.trace_update(self, observation, discount, self.e, self.lambd)  # Updates the trace
 
-        # 求出A矩阵。A矩阵应是期望值，为了减少计算量，采取渐进式的更新方法
+        # Calculates the matrix A. A should be the expectation, so use incremental update method to reduce complexity
         self.A = (1 - beta) * self.A + beta * self.e.reshape((self.observation_space_n, 1)) \
                  @ (observation - discount * next_observation).reshape((1, self.observation_space_n))
 
         self.w += (self.lr * Backend.linalg.pinv(self.A, rcond=meta_data["rcond"]) + self.eta *
-                   Backend.eye(self.observation_space_n)) @ (delta * self.e)  # 按照论文中的式子更新权重
-        # 原始式使用的是1/(1+t)，这里换成了beta
+                   Backend.eye(self.observation_space_n)) @ (delta * self.e)  # Updates the weight accordingly
+        # Originally 1/(1+t) is used, replacing it with beta
 
         return delta
 
@@ -454,14 +461,14 @@ class SVDATDAgent(AbstractAgent):
     SVDATDAgent
     ======
 
-    基于奇异值分解(SVD)加速的时序差分算法(ATD)。
+    The ATD algorithm based on SVD decomposition.
 
     Parameters
     ------
     eta :
-        半梯度时序差分(TD)学习率
+        Learning rate for semi-gradient TD.
     lr :
-        半梯度均方投影贝尔曼误差(MSPBE)学习率
+        Learning rate for semi-gradient mean squared projected Bellman error(MSPBE).
 
     See Also
     ------
@@ -492,43 +499,41 @@ class SVDATDAgent(AbstractAgent):
             d: Matrix
     ) -> Tuple[Matrix, Matrix, Matrix]:
         """
-        奇异值分解(SVD)更新。它的效果近似等于
+        SVD update. It is the same as
         :math:`\\mathbf{U}' \\mathbf{\\Sigma} '\\mathbf{V'}^\\top =
         \\mathbf{U}\\mathbf{\\Sigma}\\mathbf{V}^\\top + \\mathbf{z}\\mathbf{d}^\\top`
 
         Parameters
         ------
         U :
-            矩阵U
+            The matrix U
         Sigma :
-            矩阵∑
+            The matrix ∑
         V :
-            矩阵V
+            The matrix V
         z :
-            向量z
+            The vector z
         d :
-            向量d
-        epsilon :
-            一个很小的数，用于防止除以零
+            The vector d
 
         Returns
         ------
         Tuple[Matrix, Matrix, Matrix]
-            新的U'、∑'、V'
+            The new updated U'、∑'、V'
 
         Raises
         ------
         TypeError
-            类型错误
+            Wrong input type
         ValueError
-            数据形状无法相乘
+            Cannot multiply the matrices.
         """
         try:
             U, Sigma, V, z, d = Backend.convert_to_matrix_func(U), Backend.convert_to_matrix_func(
                 Sigma), Backend.convert_to_matrix_func(V), Backend.convert_to_matrix_func(
                 z), Backend.convert_to_matrix_func(d)
         except TypeError:
-            warnings.warn("不支持的类型！")
+            warnings.warn("Wrong input type!")
             return U, Sigma, V
         if U.ndim != 2 \
                 or Sigma.ndim != 2 \
@@ -537,7 +542,7 @@ class SVDATDAgent(AbstractAgent):
                 or V.shape[1] != Sigma.shape[1] \
                 or U.shape[0] != z.shape[0] \
                 or V.shape[0] != d.shape[0]:
-            raise ValueError("无法处理的输入！")
+            raise ValueError("Unable to handle the input!")
 
         m = U.T @ z
         p = z - U @ m
@@ -578,7 +583,7 @@ class SVDATDAgent(AbstractAgent):
                 sqrt(beta) * self.e.reshape((self.observation_space_n, 1)),
                 sqrt(beta) * (observation - discount *
                                       next_observation).reshape((self.observation_space_n, 1))
-            )  # 使用奇异值更新代替直接更新A来降低计算复杂度，提高性能
+            )  # Uses SVD update to reduce the complexity, enhancing the performance
 
         self.w += (self.lr *
                    Backend.linalg.pinv(self.U @ self.Sigma @ self.V.T, rcond=meta_data["rcond"]) +
@@ -593,16 +598,16 @@ class DiagonalizedSVDATDAgent(SVDATDAgent):
     DiagonalizedSVDATDAgent
     ======
 
-    将矩阵 :math:`\\mathbf{\\Sigma}` 对角化分解的基于奇异值分解(SVD)加速的时序差分算法(ATD)。
+    Diagonalizing :math:`\\mathbf{\\Sigma}` and SVD decomposition based ATD。
 
     Parameters
     ------
     k :
-        最大允许的矩阵大小(k*k)
+        The largest allowed size of matrices(k*k)
     svd_diagonalizing :
-        决定是否使用奇异值分解来对角化矩阵。默认为 `False`
+        Decides whether to use svd decomposition to diagonalize the matrix with orthogonality. Default is `False`
     w_update_emphasizes :
-        权重更新时更注重哪个。可选值：``accuracy(精确度) | complexity(复杂度)``
+        Decides which one comes first when updating the weight. Should be one of ``accuracy | complexity``
     """
 
     def __init__(self, k: int,
@@ -633,7 +638,7 @@ class DiagonalizedSVDATDAgent(SVDATDAgent):
                 Sigma), Backend.convert_to_matrix_func(V), Backend.convert_to_matrix_func(
                 z), Backend.convert_to_matrix_func(d)
         except TypeError:
-            warnings.warn("不支持的类型！")
+            warnings.warn("Wrong input type!")
             return U, Sigma, V
         if U.ndim != 2 \
                 or Sigma.ndim != 2 \
@@ -644,7 +649,7 @@ class DiagonalizedSVDATDAgent(SVDATDAgent):
                 or self.R.shape[0] != V.shape[1] \
                 or U.shape[0] != z.shape[0] \
                 or V.shape[0] != d.shape[0]:
-            raise ValueError("无法处理的输入！")
+            raise ValueError("Unable to handle the input!")
 
         m = self.L.T @ (U.T @ z)
         p = z - U @ (self.L @ m)
@@ -666,7 +671,8 @@ class DiagonalizedSVDATDAgent(SVDATDAgent):
 
         self.L = extend_with_010(self.L) @ L_
         self.R = extend_with_010(self.R) @ R_
-        p = p / p_l2 if p_l2 > meta_data["rcond"] else Backend.zeros_like(p)  # 向量很小时取零向量，因为零向量不会影响伪逆。
+        # Takes zero vector if the vector is infinitesimal, as it doesn't affects the Moore-Penrose inverse
+        p = p / p_l2 if p_l2 > meta_data["rcond"] else Backend.zeros_like(p)
         q = q / q_l2 if q_l2 > meta_data["rcond"] else Backend.zeros_like(q)
         U = Backend.hstack((U, p))
         V = Backend.hstack((V, q))
@@ -684,34 +690,34 @@ class DiagonalizedSVDATDAgent(SVDATDAgent):
     @staticmethod
     def diagonalize(K: Matrix) -> Tuple[Matrix, Matrix, Matrix]:
         """
-        将矩阵 :math:`\\mathbf{K}` 对角化，且是完全正交的。
+        Diagonalizes :math:`\\mathbf{K}` with orthogonality
 
         Parameters
         ------
         K : Matrix
-            待被对角化的矩阵
+            The target matrix
 
         Returns
         ------
         Tuple[Matrix, Matrix, Matrix]
-            对角化完毕的三个矩阵
+            New diagonalized matrices
 
         Raises
         ------
         ValueError
-            矩阵的形状不正确
+            Cannot multiply the matrices
         TypeError
-            不支持的输入类型
+            Invalid input type
         """
         try:
             K = Backend.convert_to_matrix_func(K)
         except TypeError:
-            raise TypeError("不支持的类型！")
+            raise TypeError("Invalid input type!")
         if K.shape[0] != K.shape[1]:
-            raise ValueError("不支持非方阵的对角化操作。")
+            raise ValueError("Diagonalizing of non-square matrices is not supported!")
 
         r, l, alpha, beta = [], [], [], []
-        # 任取一个单位向量
+        # Pick a unit vector arbitrarily
         unit = Backend.full((K.shape[0], 1), 1 / sqrt(K.shape[0]))
         r.append(unit)
 
@@ -721,18 +727,19 @@ class DiagonalizedSVDATDAgent(SVDATDAgent):
                 l[j] -= (l[i].T @ l[j]) * l[i]
             alpha.append(Backend.linalg.norm(l[j]))
             l[j] = l[j] / alpha[j] if alpha[j] > meta_data["rcond"] \
-                else Backend.zeros_like(l[j])  # 很小的向量基本都是由于误差引起，故直接置零。取零向量而不取其他向量的原因见上。下同。
+                else Backend.zeros_like(l[j])  # Sets the infinitesimal vectors to zero vectors directly like above.
 
             r.append(K.T @ l[j])
             for i in range(j + 1):
                 r[j + 1] -= (r[i].T @ r[j + 1]) * r[i]
             beta.append(Backend.linalg.norm(r[j + 1]))
             r[j + 1] = r[j + 1] / beta[j] if beta[j] > meta_data["rcond"] \
-                else Backend.zeros_like(r[j + 1])
+                else Backend.zeros_like(r[j + 1])  # The same as above.
 
+        # Builds the bi-diagonalized matrix with α and β before decomposition
         L2, Sigma, R2 = Backend.linalg.svd(
             Backend.diagflat(Backend.create_matrix_func(alpha))
-            + Backend.diagflat(Backend.create_matrix_func(beta[:-1]), 1))  # 通过α和β构造双对角矩阵再奇异值分解
+            + Backend.diagflat(Backend.create_matrix_func(beta[:-1]), 1))
         L1, R1 = Backend.hstack(l), Backend.hstack(r[:-1])
         return L1 @ L2, Backend.diagflat(Sigma), R1 @ R2.T
 
@@ -747,7 +754,7 @@ class DiagonalizedSVDATDAgent(SVDATDAgent):
     ) -> Any:
         if self.w_update_emphasizes not in meta_data["w_update_emphasizes"]:
             warnings.warn(
-                f"意外的权重更新方式{self.w_update_emphasizes}！将改为accuracy。")
+                f"Unexpected weight update emphasizes parameter {self.w_update_emphasizes}! Will be set to accuracy.")
             self.w_update_emphasizes = "accuracy"
 
         beta = 1 / (t + 1)
@@ -762,18 +769,18 @@ class DiagonalizedSVDATDAgent(SVDATDAgent):
                 sqrt(beta) * self.e.reshape((self.observation_space_n, 1)),
                 sqrt(beta) * (observation - discount *
                                       next_observation).reshape((self.observation_space_n, 1))
-            )  # 使用奇异值更新代替直接更新A来降低计算复杂度，提高性能
+            )  # Uses SVD update to reduce the complexity, enhancing the performance
 
-        # 参考论文降低了复杂度。
+        # Reduces the complexity according to the paper
         if self.w_update_emphasizes == "accuracy":
-            # 原本直接按公式更新：
+            # Originally:
             self.w += (self.lr *
                        Backend.linalg.pinv(self.U @ self.L @ self.Sigma @ (self.V @ self.R).T,
                                            rcond=meta_data["rcond"]) +
                        self.eta *
                        Backend.eye(self.observation_space_n)) @ (delta * self.e)
         elif self.w_update_emphasizes == "complexity":
-            # 降低复杂度的更新方法：
+            # The one with less complexity:
             self.w += self.lr * self.V @ self.R @ (Backend.diagflat(
                 Backend.create_matrix_func(
                     [(1 / sigma if abs(sigma) > meta_data["rcond"] else 0) for sigma in Backend.diagonal(self.Sigma)]
