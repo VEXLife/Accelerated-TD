@@ -20,7 +20,7 @@
 
 import os
 import warnings
-from typing import Union
+from typing import TypeAlias, Union
 
 if "ATD_BACKEND" not in os.environ:
     os.environ["ATD_BACKEND"] = "NumPy"
@@ -41,8 +41,8 @@ if os.environ["ATD_BACKEND"] == "NumPy":
     try:
         import numpy as Backend
 
-        Matrix = Backend.ndarray
-        Fraction: Union = Union[int, float, Backend.floating, Backend.integer]
+        Matrix: TypeAlias = Backend.ndarray
+        Decimal: TypeAlias = Union[int, float, Backend.floating, Backend.integer]
         Backend.create_matrix_func = Backend.array
         Backend.convert_to_matrix_func = Backend.asarray
 
@@ -76,8 +76,8 @@ elif os.environ["ATD_BACKEND"] == "PyTorch":
         import torch.nn.functional as F
         from itertools import chain
 
-        Matrix = Backend.Tensor
-        Fraction: Union = Union[int, float, Backend.FloatType, Backend.IntType]
+        Matrix: TypeAlias = Backend.Tensor
+        Decimal: TypeAlias = Union[int, float, Backend.FloatType, Backend.IntType]
         Backend.create_matrix_func = Backend.tensor
         Backend.convert_to_matrix_func = Backend.as_tensor
 

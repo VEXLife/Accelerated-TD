@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="446" height="42" role="img" aria-label="Translations">
+<title>Translations</title>
+<defs>
+<linearGradient id="s" x2="0" y2="100%">
+<stop offset="0" stop-color="#bbb" stop-opacity=".1"/>
+<stop offset="1" stop-opacity=".1"/>
+</linearGradient>
+</defs>
+<g>
+<rect width="160" height="42" fill="#555"/>
+<rect width="160" height="42" fill="url(#s)"/>
+</g>
+<g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" text-rendering="geometricPrecision" font-size="110">
+<text x="395" y="140" transform="scale(.2)" fill="#fff">Translations</text>
+</g>
+<a target="_blank" xlink:href="README.md">
+<g>
+<rect x="160" width="103" height="42" fill="#77f"/>
+<rect x="160" width="103" height="42" fill="url(#s)"/>
+</g>
+<g>
+<text x="165" y="25" transform="scale(1.1)" fill="#fff">English</text>
+</g>
+</a>
+<a target="_blank" xlink:href="README_zh.md">
+<g>
+<rect x="263" width="103" height="42" fill="#de2910"/>
+</g>
+<g>
+<text x="255" y="25" transform="scale(1.1)" fill="#fff">简体中文</text>
+</g>
+</a>
+<a target="_blank" xlink:href="README_jp.md">
+<g>
+<rect x="366" width="80" height="42" fill="#c72"/>
+</g>
+<g>
+<text x="345" y="25" transform="scale(1.1)" fill="#fff">日本語</text>
+</g>
+</a>
+</svg>

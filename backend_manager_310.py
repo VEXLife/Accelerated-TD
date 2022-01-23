@@ -31,7 +31,7 @@ match os.environ["ATD_BACKEND"]:
             import numpy as Backend
 
             Matrix: TypeAlias = Backend.ndarray
-            Fraction: Union = int | float | Backend.floating | Backend.integer
+            Decimal: TypeAlias = int | float | Backend.floating | Backend.integer
             Backend.create_matrix_func = Backend.array
             Backend.convert_to_matrix_func = Backend.asarray
 
@@ -66,7 +66,7 @@ match os.environ["ATD_BACKEND"]:
             from itertools import chain
 
             Matrix: TypeAlias = Backend.Tensor
-            Fraction: Union = int | float | Backend.FloatType | Backend.IntType
+            Decimal: TypeAlias = int | float | Backend.FloatType | Backend.IntType
             Backend.create_matrix_func = Backend.tensor
             Backend.convert_to_matrix_func = Backend.as_tensor
 

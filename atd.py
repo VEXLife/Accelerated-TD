@@ -25,7 +25,7 @@ atd
 
 Now you're able to switch between backends including NumPy and PyTorch(CPU) via
 setting environment variable "ATD_BACKEND".\n
-For more details, see `README.MD`.
+For more details, see `README.md`.
 
 Notes
 ------
@@ -61,9 +61,9 @@ except ImportError:
 try:
     if sys.version_info < (3, 10):
         # Support for old version
-        from backend_manager_39 import Backend, Matrix, Fraction, isinstance, extend_with_000, extend_with_010
+        from backend_manager_39 import Backend, Matrix, Decimal, isinstance, extend_with_000, extend_with_010
     else:
-        from backend_manager_310 import Backend, Matrix, Fraction, extend_with_000, extend_with_010
+        from backend_manager_310 import Backend, Matrix, Decimal, extend_with_000, extend_with_010
 except ImportError:
     raise ImportError("Unable to import the specified backend!")
     exit(-1)
@@ -71,9 +71,9 @@ except ImportError:
 meta_data: dict = {"trace_update_mode": {},
                    "w_update_emphasizes": ["complexity", "accuracy"],
                    "rcond": 1e-5}  # Meta data
-TraceUpdateFunction: Final = Callable[[Any, Matrix, Fraction, Optional[Matrix],
-                                       Optional[Fraction], Optional[Fraction],
-                                       Optional[Fraction]], Matrix]
+TraceUpdateFunction: Final = Callable[[Any, Matrix, Decimal, Optional[Matrix],
+                                       Optional[Decimal], Optional[Decimal],
+                                       Optional[Decimal]], Matrix]
 
 
 def learn_func_wrapper(
@@ -98,7 +98,7 @@ def learn_func_wrapper(
             self.observation_space_n,), f"Bad observation shape. Expected ({self.observation_space_n},), not {observation.shape}"
         assert next_observation.shape == (
             self.observation_space_n,), f"Bad next observation shape. Expected ({self.observation_space_n},), not {next_observation.shape}"
-        if not (isinstance(reward, Fraction) and isinstance(discount, Fraction)
+        if not (isinstance(reward, Decimal) and isinstance(discount, Decimal)
                 and isinstance(t, int) and isinstance(self, AbstractAgent)):
             raise TypeError("Invalid input type!")
         if not (t >= 0 and 0 <= discount <= 1):
@@ -132,12 +132,12 @@ def register_trace_update_func(
 
         @wraps(func)
         def _trace_update_func(self: Any, observation: Matrix,
-                               discount: Fraction, e: Optional[Matrix] = None,
-                               lambd: Optional[Fraction] = None, rho: Optional[Fraction] = 1.,
-                               i: Optional[Fraction] = 1.) -> Matrix:
+                               discount: Decimal, e: Optional[Matrix] = None,
+                               lambd: Optional[Decimal] = None, rho: Optional[Decimal] = 1.,
+                               i: Optional[Decimal] = 1.) -> Matrix:
             assert observation.shape == (
                 self.observation_space_n,), f"Bad observation shape. Expected ({self.observation_space_n},), not {observation.shape}"
-            if not (isinstance(discount, Fraction) and isinstance(lambd, Fraction)
+            if not (isinstance(discount, Decimal) and isinstance(lambd, Decimal)
                     and isinstance(self, AbstractAgent)):
                 raise TypeError("Invalid input type!")
             if not 0 <= discount <= 1:
@@ -185,19 +185,19 @@ class AbstractAgent:
     """
 
     def __init__(self, observation_space_n: int, action_space_n: int,
-                 lr: Union[Callable[[int], Fraction], Fraction], lambd: Optional[Fraction] = 0,
+                 lr: Union[Callable[[int], Decimal], Decimal], lambd: Optional[Decimal] = 0,
                  trace_update_mode: Optional[str] = "conventional") -> None:
         if not (isinstance(observation_space_n, int)
                 and isinstance(action_space_n, int)
-                and isinstance(lambd, Fraction)
-                and isinstance(meta_data["rcond"], Fraction)
+                and isinstance(lambd, Decimal)
+                and isinstance(meta_data["rcond"], Decimal)
                 and isinstance(trace_update_mode, str)):
             raise TypeError("Invalid input type!")
         if trace_update_mode not in meta_data["trace_update_mode"].keys():
             warnings.warn(
                 f"Not supported trace update mode: {trace_update_mode}! Will be set to conventional。")
             trace_update_mode = "conventional"
-        if isinstance(lr, Fraction):
+        if isinstance(lr, Decimal):
             self.lr_func = lambda t: lr
         else:
             assert callable(lr), "Unable to deal with the learning rate input."
@@ -230,8 +230,8 @@ class AbstractAgent:
             self,
             observation: Matrix,
             next_observation: Matrix,
-            reward: Fraction,
-            discount: Fraction,
+            reward: Decimal,
+            discount: Decimal,
             t: int
     ) -> Any:
         """
@@ -301,9 +301,9 @@ class AbstractAgent:
 
     @staticmethod
     @final
-    def trace_update(self, observation: Matrix, discount: Fraction, e: Optional[Matrix] = None,
-                     lambd: Optional[Fraction] = None, rho: Optional[Fraction] = 1.,
-                     i: Optional[Fraction] = 1.) -> Matrix:
+    def trace_update(self, observation: Matrix, discount: Decimal, e: Optional[Matrix] = None,
+                     lambd: Optional[Decimal] = None, rho: Optional[Decimal] = 1.,
+                     i: Optional[Decimal] = 1.) -> Matrix:
         """
         Trace update function (accumulative).\n
         If you're about to include your own trace update function, please do not override this function, but define
@@ -349,8 +349,8 @@ class AbstractAgent:
 
     @staticmethod
     @register_trace_update_func("conventional")
-    def __trace_update(*, self, observation: Matrix, discount: Fraction, e: Optional[Matrix] = None,
-                       lambd: Optional[Fraction] = None, **kwargs) -> Matrix:
+    def __trace_update(*, self, observation: Matrix, discount: Decimal, e: Optional[Matrix] = None,
+                       lambd: Optional[Decimal] = None, **kwargs) -> Matrix:
         """
         Internal function.
         The implementation of concrete conventional trace update algorithm.
@@ -359,14 +359,14 @@ class AbstractAgent:
 
     @staticmethod
     @register_trace_update_func("emphatic")
-    def __emphatic_trace_update(*, self, observation: Matrix, discount: Fraction, e: Optional[Matrix] = None,
-                                lambd: Optional[Fraction] = None, rho: Optional[Fraction] = 1.,
-                                i: Optional[Fraction] = 1., **kwargs) -> Matrix:
+    def __emphatic_trace_update(*, self, observation: Matrix, discount: Decimal, e: Optional[Matrix] = None,
+                                lambd: Optional[Decimal] = None, rho: Optional[Decimal] = 1.,
+                                i: Optional[Decimal] = 1., **kwargs) -> Matrix:
         """
         Internal function.
         The implementation of concrete emphatic trace update algorithm.
         """
-        if not (isinstance(rho, Fraction) and isinstance(i, Fraction)):
+        if not (isinstance(rho, Decimal) and isinstance(i, Decimal)):
             raise TypeError("Invalid input type!")
 
         self.F = rho * discount * self.F + i
@@ -392,8 +392,8 @@ class TDAgent(AbstractAgent):
             self,
             observation: Matrix,
             next_observation: Matrix,
-            reward: Fraction,
-            discount: Fraction,
+            reward: Decimal,
+            discount: Decimal,
             t: int
     ) -> Any:
         self.e = self.trace_update(self, observation, discount, self.e, self.lambd)  # Updates the trace
@@ -419,11 +419,11 @@ class PlainATDAgent(AbstractAgent):
     """
 
     def __init__(self,
-                 eta: Fraction,
-                 lr: Optional[Union[Callable[[int], Fraction], Fraction]] = lambda t: 1 / (t + 1),
+                 eta: Decimal,
+                 lr: Optional[Union[Callable[[int], Decimal], Decimal]] = lambda t: 1 / (t + 1),
                  **kwargs) -> None:
         super().__init__(lr=lr, **kwargs)
-        if not (isinstance(eta, Fraction)):
+        if not (isinstance(eta, Decimal)):
             raise TypeError("Invalid input type!")
 
         self.eta = eta
@@ -437,8 +437,8 @@ class PlainATDAgent(AbstractAgent):
             self,
             observation: Matrix,
             next_observation: Matrix,
-            reward: Fraction,
-            discount: Fraction,
+            reward: Decimal,
+            discount: Decimal,
             t: int
     ) -> Any:
         beta = 1 / (t + 1)  # As this value is frequently used, assign it to a variable β
@@ -476,11 +476,11 @@ class SVDATDAgent(AbstractAgent):
     """
 
     def __init__(self,
-                 eta: Fraction,
-                 lr: Optional[Union[Callable[[int], Fraction], Fraction]] = lambda t: 1 / (t + 1),
+                 eta: Decimal,
+                 lr: Optional[Union[Callable[[int], Decimal], Decimal]] = lambda t: 1 / (t + 1),
                  **kwargs) -> None:
         super().__init__(lr=lr, **kwargs)
-        if not (isinstance(eta, Fraction)):
+        if not (isinstance(eta, Decimal)):
             raise TypeError("Invalid input type!")
 
         self.eta = eta
@@ -567,8 +567,8 @@ class SVDATDAgent(AbstractAgent):
             self,
             observation: Matrix,
             next_observation: Matrix,
-            reward: Fraction,
-            discount: Fraction,
+            reward: Decimal,
+            discount: Decimal,
             t: int
     ) -> Any:
         beta = 1 / (t + 1)
@@ -748,8 +748,8 @@ class DiagonalizedSVDATDAgent(SVDATDAgent):
             self,
             observation: Matrix,
             next_observation: Matrix,
-            reward: Fraction,
-            discount: Fraction,
+            reward: Decimal,
+            discount: Decimal,
             t: int
     ) -> Any:
         if self.w_update_emphasizes not in meta_data["w_update_emphasizes"]:
