@@ -174,7 +174,7 @@ class AbstractAgent:
     lambd :
         λ for trace updating
     trace_update_mode :
-        Trace update mode, should be in ``conventional | emphatic`` . Default is ``conventional``.
+        Trace update mode, should be ``conventional | emphatic`` . Default is ``conventional``.
 
     Raises
     ------
@@ -195,7 +195,7 @@ class AbstractAgent:
             raise TypeError("Invalid input type!")
         if trace_update_mode not in meta_data["trace_update_mode"].keys():
             warnings.warn(
-                f"Not supported trace update mode: {trace_update_mode}! Will be set to conventional。")
+                f"Not supported trace update mode: {trace_update_mode}! Will be set to conventional.")
             trace_update_mode = "conventional"
         if isinstance(lr, Decimal):
             self.lr_func = lambda t: lr
